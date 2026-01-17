@@ -29,10 +29,10 @@ This is the most leveraged moment in any project. Deep questioning here means be
 
 <execution_context>
 
-@~/.claude/get-shit-done/references/questioning.md
-@~/.claude/get-shit-done/references/ui-brand.md
-@~/.claude/get-shit-done/templates/project.md
-@~/.claude/get-shit-done/templates/requirements.md
+@~/.claude/gsd/references/questioning.md
+@~/.claude/gsd/references/ui-brand.md
+@~/.claude/gsd/templates/project.md
+@~/.claude/gsd/templates/requirements.md
 
 </execution_context>
 
@@ -366,7 +366,7 @@ Your STACK.md feeds into roadmap creation. Be prescriptive:
 
 <output>
 Write to: .planning/research/STACK.md
-Use template: ~/.claude/get-shit-done/templates/research-project/STACK.md
+Use template: ~/.claude/gsd/templates/research-project/STACK.md
 </output>
 ", subagent_type="gsd-project-researcher", description="Stack research")
 
@@ -405,7 +405,7 @@ Your FEATURES.md feeds into requirements definition. Categorize clearly:
 
 <output>
 Write to: .planning/research/FEATURES.md
-Use template: ~/.claude/get-shit-done/templates/research-project/FEATURES.md
+Use template: ~/.claude/gsd/templates/research-project/FEATURES.md
 </output>
 ", subagent_type="gsd-project-researcher", description="Features research")
 
@@ -444,7 +444,7 @@ Your ARCHITECTURE.md informs phase structure in roadmap. Include:
 
 <output>
 Write to: .planning/research/ARCHITECTURE.md
-Use template: ~/.claude/get-shit-done/templates/research-project/ARCHITECTURE.md
+Use template: ~/.claude/gsd/templates/research-project/ARCHITECTURE.md
 </output>
 ", subagent_type="gsd-project-researcher", description="Architecture research")
 
@@ -483,7 +483,7 @@ Your PITFALLS.md prevents mistakes in roadmap/planning. For each pitfall:
 
 <output>
 Write to: .planning/research/PITFALLS.md
-Use template: ~/.claude/get-shit-done/templates/research-project/PITFALLS.md
+Use template: ~/.claude/gsd/templates/research-project/PITFALLS.md
 </output>
 ", subagent_type="gsd-project-researcher", description="Pitfalls research")
 ```
@@ -506,7 +506,7 @@ Read these files:
 
 <output>
 Write to: .planning/research/SUMMARY.md
-Use template: ~/.claude/get-shit-done/templates/research-project/SUMMARY.md
+Use template: ~/.claude/gsd/templates/research-project/SUMMARY.md
 Commit after writing.
 </output>
 ", subagent_type="gsd-research-synthesizer", description="Synthesize research")

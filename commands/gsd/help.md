@@ -35,9 +35,11 @@ GSD evolves fast. Check for updates periodically:
 
 Shows what changed since your installed version. Update with:
 
-```bash
-npx get-shit-done-cc@latest
 ```
+/gsd:update
+```
+
+Or download the latest release from https://github.com/puremachinery/gsd/releases
 
 ## Core Workflow
 

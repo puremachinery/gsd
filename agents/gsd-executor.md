@@ -583,7 +583,7 @@ After all tasks complete, create `{phase}-{plan}-SUMMARY.md`.
 
 **Location:** `.planning/phases/XX-name/{phase}-{plan}-SUMMARY.md`
 
-**Use template from:** @~/.claude/get-shit-done/templates/summary.md
+**Use template from:** @~/.claude/gsd/templates/summary.md
 
 **Frontmatter population:**
 

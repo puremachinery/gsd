@@ -5,17 +5,22 @@ description: Update GSD to latest version with changelog display
 
 <objective>
 Check for GSD updates, install if available, and display what changed.
-
-Provides a better update experience than raw `npx get-shit-done-cc` by showing version diff and changelog entries.
 </objective>
 
 <process>
 
 <step name="get_installed_version">
-Read installed version:
+Check for VERSION file (local install takes priority over global):
 
 ```bash
-cat ~/.claude/get-shit-done/VERSION 2>/dev/null
+# Try local first, then global
+if [ -f "./.claude/gsd/VERSION" ]; then
+  cat ./.claude/gsd/VERSION
+elif [ -f ~/.claude/gsd/VERSION ]; then
+  cat ~/.claude/gsd/VERSION
+else
+  echo "not-installed"
+fi
 ```
 
 **If VERSION file missing:**
@@ -26,27 +31,38 @@ cat ~/.claude/get-shit-done/VERSION 2>/dev/null
 
 Your installation doesn't include version tracking.
 
-Running fresh install...
+Please reinstall GSD from https://github.com/puremachinery/gsd/releases
 ```
 
-Proceed to install step (treat as version 0.0.0 for comparison).
+Proceed to check step (treat as version 0.0.0 for comparison).
 </step>
 
 <step name="check_latest_version">
-Check npm for latest version:
+Check GitHub API for latest release:
 
-```bash
-npm view get-shit-done-cc version 2>/dev/null
+Use WebFetch tool with:
+- URL: `https://api.github.com/repos/puremachinery/gsd/releases/latest`
+- Prompt: "Extract the tag_name field (version number) from this GitHub release JSON. If the response is a 404 or 'Not Found', return 'no-releases'."
+
+**If response is 404 or "Not Found"** (no releases published yet):
+```
+## GSD Update
+
+No releases published yet. You're running a development version.
+
+Check https://github.com/puremachinery/gsd/releases for future releases.
 ```
 
-**If npm check fails:**
-```
-Couldn't check for updates (offline or npm unavailable).
+STOP here if no releases.
 
-To update manually: `npx get-shit-done-cc --global`
+**If fetch fails for other reasons** (network error, timeout):
+```
+Couldn't check for updates (offline or GitHub unavailable).
+
+Check manually: https://github.com/puremachinery/gsd/releases
 ```
 
-STOP here if npm unavailable.
+STOP here if GitHub unavailable.
 </step>
 
 <step name="compare_versions">
@@ -80,43 +96,22 @@ STOP here if ahead.
 <step name="show_changes_and_confirm">
 **If update available**, fetch and show what's new BEFORE updating:
 
-1. Fetch changelog (same as fetch_changelog step)
+1. Fetch changelog from GitHub
 2. Extract entries between installed and latest versions
 3. Display preview and ask for confirmation:
 
 ```
 ## GSD Update Available
 
-**Installed:** 1.5.10
-**Latest:** 1.5.15
+**Installed:** X.Y.Z
+**Latest:** X.Y.Z+1
 
 ### What's New
 ────────────────────────────────────────────────────────────
 
-## [1.5.15] - 2026-01-20
-
-### Added
-- Feature X
-
-## [1.5.14] - 2026-01-18
-
-### Fixed
-- Bug fix Y
+[Changelog entries extracted from CHANGELOG.md]
 
 ────────────────────────────────────────────────────────────
-
-⚠️  **Note:** The installer performs a clean install of GSD folders:
-- `~/.claude/commands/gsd/` will be wiped and replaced
-- `~/.claude/get-shit-done/` will be wiped and replaced
-- `~/.claude/agents/gsd-*` files will be replaced
-
-Your custom files in other locations are preserved:
-- Custom commands in `~/.claude/commands/your-stuff/` ✓
-- Custom agents not prefixed with `gsd-` ✓
-- Custom hooks ✓
-- Your CLAUDE.md files ✓
-
-If you've modified any GSD files directly, back them up first.
 ```
 
 Use AskUserQuestion:
@@ -129,32 +124,44 @@ Use AskUserQuestion:
 </step>
 
 <step name="run_update">
-Run the update:
+Guide user to download and install. **Match the install type detected in step 1:**
 
-```bash
-npx get-shit-done-cc --global
+**If local VERSION was found** (`./.claude/gsd/VERSION`):
+```
+Download the latest release for your platform:
+https://github.com/puremachinery/gsd/releases/latest
+
+Then run: gsd install --local
 ```
 
-Capture output. If install fails, show error and STOP.
+**If global VERSION was found** (`~/.claude/gsd/VERSION`):
+```
+Download the latest release for your platform:
+https://github.com/puremachinery/gsd/releases/latest
+
+Then run: gsd install --global
+```
 
 Clear the update cache so statusline indicator disappears:
 
 ```bash
-rm -f ~/.claude/cache/gsd-update-check.json
+# Clear from the detected install location
+rm -f ./.claude/cache/gsd-update-check.json 2>/dev/null   # if local
+rm -f ~/.claude/cache/gsd-update-check.json 2>/dev/null   # if global
 ```
 </step>
 
 <step name="display_result">
-Format completion message (changelog was already shown in confirmation step):
+Format completion message:
 
 ```
 ╔═══════════════════════════════════════════════════════════╗
-║  GSD Updated: v1.5.10 → v1.5.15                           ║
+║  GSD Updated: vX.Y.Z → vX.Y.Z+1                           ║
 ╚═══════════════════════════════════════════════════════════╝
 
-⚠️  Restart Claude Code to pick up the new commands.
+Restart Claude Code to pick up the new commands.
 
-[View full changelog](https://github.com/glittercowboy/get-shit-done/blob/main/CHANGELOG.md)
+View full changelog: https://github.com/puremachinery/gsd/blob/master/CHANGELOG.md
 ```
 </step>
 
@@ -162,10 +169,9 @@ Format completion message (changelog was already shown in confirmation step):
 
 <success_criteria>
 - [ ] Installed version read correctly
-- [ ] Latest version checked via npm
+- [ ] Latest version checked via GitHub API
 - [ ] Update skipped if already current
 - [ ] Changelog fetched and displayed BEFORE update
-- [ ] Clean install warning shown
 - [ ] User confirmation obtained
 - [ ] Update executed successfully
 - [ ] Restart reminder shown

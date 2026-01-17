@@ -12,10 +12,17 @@ Shows version comparison, changelog entries for missed versions, and update inst
 <process>
 
 <step name="get_installed_version">
-Read installed version from VERSION file:
+Check for VERSION file (local install takes priority over global):
 
 ```bash
-cat ~/.claude/get-shit-done/VERSION 2>/dev/null
+# Try local first, then global
+if [ -f "./.claude/gsd/VERSION" ]; then
+  cat ./.claude/gsd/VERSION
+elif [ -f ~/.claude/gsd/VERSION ]; then
+  cat ~/.claude/gsd/VERSION
+else
+  echo "not-installed"
+fi
 ```
 
 **If VERSION file missing:**
@@ -26,9 +33,7 @@ cat ~/.claude/get-shit-done/VERSION 2>/dev/null
 
 Your installation doesn't include version tracking.
 
-**To fix:** `npx get-shit-done-cc --global`
-
-This will reinstall with version tracking enabled.
+**To fix:** Download and reinstall from https://github.com/puremachinery/gsd/releases
 ```
 
 STOP here if no VERSION file.
@@ -38,13 +43,18 @@ STOP here if no VERSION file.
 Fetch latest CHANGELOG.md from GitHub:
 
 Use WebFetch tool with:
-- URL: `https://raw.githubusercontent.com/glittercowboy/get-shit-done/main/CHANGELOG.md`
+- URL: `https://raw.githubusercontent.com/puremachinery/gsd/master/CHANGELOG.md`
 - Prompt: "Extract all version entries with their dates and changes. Return in Keep-a-Changelog format."
 
 **If fetch fails:**
-Fall back to local changelog:
+Fall back to local changelog (using resolved config dir):
 ```bash
-cat ~/.claude/get-shit-done/CHANGELOG.md 2>/dev/null
+# Try local first, then global
+if [ -f "./.claude/gsd/CHANGELOG.md" ]; then
+  cat ./.claude/gsd/CHANGELOG.md
+elif [ -f ~/.claude/gsd/CHANGELOG.md ]; then
+  cat ~/.claude/gsd/CHANGELOG.md
+fi
 ```
 
 Note to user: "Couldn't check for updates (offline or GitHub unavailable). Showing local changelog."
@@ -57,7 +67,20 @@ From the remote (or local) changelog:
 2. **Compare with installed** - From VERSION file
 3. **Extract entries between** - All version sections from latest down to (but not including) installed
 
+**If no version sections found** (only `[Unreleased]`):
+```
+## GSD What's New
+
+**Installed:** (your version)
+**Latest:** No releases yet
+
+This project hasn't published any releases yet. You're running a development version.
+
+Check https://github.com/puremachinery/gsd/releases for updates.
+```
+
 **Version comparison:**
+- If no releases yet: Show "no releases" message above
 - If installed == latest: "You're on the latest version"
 - If installed < latest: Show changes since installed version
 - If installed > latest: "You're ahead of latest release (development version?)"
@@ -70,44 +93,32 @@ Format output clearly:
 ```
 ## GSD What's New
 
-**Installed:** 1.4.26
-**Latest:** 1.4.26
+**Installed:** X.Y.Z
+**Latest:** X.Y.Z
 
 You're on the latest version.
 
-[View full changelog](https://github.com/glittercowboy/get-shit-done/blob/main/CHANGELOG.md)
+[View full changelog](https://github.com/puremachinery/gsd/blob/master/CHANGELOG.md)
 ```
 
 **If updates available:**
 ```
 ## GSD What's New
 
-**Installed:** 1.4.23
-**Latest:** 1.4.26
+**Installed:** X.Y.Z
+**Latest:** X.Y.Z+1
 
 ---
 
 ### Changes since your version:
 
-## [1.4.26] - 2026-01-20
-
-### Added
-- Feature X
-- Feature Y
-
-### Changed
-- **BREAKING:** Changed Z behavior
-
-## [1.4.25] - 2026-01-18
-
-### Fixed
-- Bug in feature A
+[Changelog entries extracted from CHANGELOG.md]
 
 ---
 
-[View full changelog](https://github.com/glittercowboy/get-shit-done/blob/main/CHANGELOG.md)
+[View full changelog](https://github.com/puremachinery/gsd/blob/master/CHANGELOG.md)
 
-**To update:** `npx get-shit-done-cc --global`
+**To update:** `gsd update` or download from https://github.com/puremachinery/gsd/releases
 ```
 
 **Breaking changes:** Surface prominently with **BREAKING:** prefix in the output.

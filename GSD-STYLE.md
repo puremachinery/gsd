@@ -36,7 +36,7 @@ allowed-tools: [Read, Write, Bash, Glob, Grep, AskUserQuestion]
 
 **Commands are thin wrappers.** Delegate detailed logic to workflows.
 
-### Workflows (`get-shit-done/workflows/*.md`)
+### Workflows (`gsd/workflows/*.md`)
 
 No YAML frontmatter. Structure varies by workflow.
 
@@ -55,7 +55,7 @@ Some workflows use domain-specific tags like `<philosophy>`, `<references>`, `<p
 
 **Key principle:** Match the style of the specific workflow you're editing.
 
-### Templates (`get-shit-done/templates/*.md`)
+### Templates (`gsd/templates/*.md`)
 
 Structure varies. Common patterns:
 - Most start with `# [Name] Template` header
@@ -66,7 +66,7 @@ Structure varies. Common patterns:
 - Square brackets: `[Project Name]`, `[Description]`
 - Curly braces: `{phase}-{plan}-PLAN.md`
 
-### References (`get-shit-done/references/*.md`)
+### References (`gsd/references/*.md`)
 
 Typically use outer XML containers related to filename, but structure varies.
 
@@ -164,7 +164,7 @@ Build authentication system
 
 **Static references** (always load):
 ```
-@~/.claude/get-shit-done/workflows/execute-phase.md
+@~/.claude/gsd/workflows/execute-phase.md
 @.planning/PROJECT.md
 ```
 
@@ -313,7 +313,7 @@ Use subagents for autonomous work. Reserve main context for user interaction.
 
 ## UX Patterns
 
-**Visual patterns:** `get-shit-done/references/ui-brand.md`
+**Visual patterns:** `gsd/references/ui-brand.md`
 
 Orchestrators @-reference ui-brand.md for stage banners, checkpoint boxes, status symbols, and completion displays.
 

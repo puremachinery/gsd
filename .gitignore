@@ -6,5 +6,8 @@ CLAUDE.md
 .planning
 /research.claude/
 
+# Local notes and private files
+.local/
+
 # Local test installs
 .claude/

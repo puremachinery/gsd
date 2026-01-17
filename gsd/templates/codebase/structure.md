@@ -118,129 +118,159 @@ Template for `.planning/codebase/STRUCTURE.md` - captures physical file organiza
 ```markdown
 # Codebase Structure
 
-**Analysis Date:** 2025-01-20
+**Analysis Date:** 2026-01-17
 
 ## Directory Layout
 
 ```
-get-shit-done/
-├── bin/                # Executable entry points
-├── commands/           # Slash command definitions
-│   └── gsd/           # GSD-specific commands
-├── get-shit-done/     # Skill resources
-│   ├── references/    # Principle documents
-│   ├── templates/     # File templates
-│   └── workflows/     # Multi-step procedures
-├── src/               # Source code (if applicable)
-├── tests/             # Test files
-├── package.json       # Project manifest
-└── README.md          # User documentation
+gsd/
+├── core/                  # Platform-agnostic content
+│   ├── templates/         # File structure templates
+│   ├── references/        # Deep-dive guides
+│   └── concepts/          # Workflow philosophy docs
+├── platforms/
+│   └── claude/            # Claude Code implementation
+│       ├── commands/gsd/  # Slash commands
+│       ├── workflows/     # Orchestration workflows
+│       └── agents/        # Subagent definitions
+├── installer/             # Nim source
+│   ├── src/               # Nim source files
+│   └── gsd.nimble         # Build configuration
+├── dist/                  # Built binaries (gitignored)
+├── ARCHITECTURE.md        # System design spec
+├── CHANGELOG.md           # Version history
+├── LICENSE                # MIT license
+└── README.md              # User documentation
 ```
 
 ## Directory Purposes
 
-**bin/**
-- Purpose: CLI entry points
-- Contains: install.js (installer script)
-- Key files: install.js - handles npx installation
-- Subdirectories: None
+**core/templates/**
+- Purpose: Document templates for .planning/ files
+- Contains: Template definitions with frontmatter
+- Key files: project.md, roadmap.md, plan.md, summary.md
+- Subdirectories: codebase/ (stack/architecture/structure templates)
 
-**commands/gsd/**
-- Purpose: Slash command definitions for Claude Code
-- Contains: *.md files (one per command)
-- Key files: new-project.md, plan-phase.md, execute-plan.md
-- Subdirectories: None (flat structure)
-
-**get-shit-done/references/**
+**core/references/**
 - Purpose: Core philosophy and guidance documents
 - Contains: principles.md, questioning.md, plan-format.md
 - Key files: principles.md - system philosophy
 - Subdirectories: None
 
-**get-shit-done/templates/**
-- Purpose: Document templates for .planning/ files
-- Contains: Template definitions with frontmatter
-- Key files: project.md, roadmap.md, plan.md, summary.md
-- Subdirectories: codebase/ (new - for stack/architecture/structure templates)
+**core/concepts/**
+- Purpose: Workflow philosophy documentation
+- Contains: context-engineering.md, phase-workflow.md
+- Key files: context-engineering.md - why fresh contexts matter
+- Subdirectories: None
 
-**get-shit-done/workflows/**
+**platforms/claude/commands/gsd/**
+- Purpose: Slash command definitions for Claude Code
+- Contains: *.md files (one per command)
+- Key files: new-project.md, plan-phase.md, execute-phase.md
+- Subdirectories: None (flat structure)
+
+**platforms/claude/workflows/**
 - Purpose: Reusable multi-step procedures
 - Contains: Workflow definitions called by commands
 - Key files: execute-plan.md, research-phase.md
 - Subdirectories: None
 
+**platforms/claude/agents/**
+- Purpose: Subagent definitions for Task tool
+- Contains: Agent prompt definitions
+- Key files: implementer.md, verifier.md, researcher.md
+- Subdirectories: None
+
+**installer/src/**
+- Purpose: Nim source for CLI binary
+- Contains: *.nim source files
+- Key files: gsd.nim (entry), install.nim, statusline.nim
+- Subdirectories: None
+
 ## Key File Locations
 
 **Entry Points:**
-- `bin/install.js` - Installation script (npx entry)
+- `installer/src/gsd.nim` - CLI entry point
 
 **Configuration:**
-- `package.json` - Project metadata, dependencies, bin entry
+- `installer/gsd.nimble` - Nim build configuration
 - `.gitignore` - Excluded files
 
 **Core Logic:**
-- `bin/install.js` - All installation logic (file copying, path replacement)
+- `installer/src/install.nim` - Installation logic
+- `installer/src/statusline.nim` - Status bar hook
+- `installer/src/config.nim` - Config resolution
 
 **Testing:**
-- `tests/` - Test files (if present)
+- `installer/tests/` - Nim unit tests
 
 **Documentation:**
 - `README.md` - User-facing installation and usage guide
+- `ARCHITECTURE.md` - System design specification
 - `CLAUDE.md` - Instructions for Claude Code when working in this repo
 
 ## Naming Conventions
 
 **Files:**
 - kebab-case.md: Markdown documents
-- kebab-case.js: JavaScript source files
+- snake_case.nim: Nim source files (or camelCase per preference)
 - UPPERCASE.md: Important project files (README, CLAUDE, CHANGELOG)
 
 **Directories:**
 - kebab-case: All directories
-- Plural for collections: templates/, commands/, workflows/
+- Plural for collections: templates/, commands/, workflows/, agents/
 
 **Special Patterns:**
 - {command-name}.md: Slash command definition
-- *-template.md: Could be used but templates/ directory preferred
+- gsd-{platform}-{arch}: Built binary naming
 
 ## Where to Add New Code
 
 **New Slash Command:**
-- Primary code: `commands/gsd/{command-name}.md`
-- Tests: `tests/commands/{command-name}.test.js` (if testing implemented)
+- Primary code: `platforms/claude/commands/gsd/{command-name}.md`
 - Documentation: Update `README.md` with new command
 
 **New Template:**
-- Implementation: `get-shit-done/templates/{name}.md`
+- Implementation: `core/templates/{name}.md`
 - Documentation: Template is self-documenting (includes guidelines)
 
 **New Workflow:**
-- Implementation: `get-shit-done/workflows/{name}.md`
-- Usage: Reference from command with `@~/.claude/get-shit-done/workflows/{name}.md`
+- Implementation: `platforms/claude/workflows/{name}.md` (source)
+- Installed to: `~/.claude/gsd/workflows/{name}.md` (flattened)
+- Usage: Reference from command with `@~/.claude/gsd/workflows/{name}.md`
 
 **New Reference Document:**
-- Implementation: `get-shit-done/references/{name}.md`
+- Implementation: `core/references/{name}.md`
 - Usage: Reference from commands/workflows as needed
 
-**Utilities:**
-- No utilities yet (`install.js` is monolithic)
-- If extracted: `src/utils/`
+**New Agent:**
+- Implementation: `platforms/claude/agents/{name}.md`
+- Usage: Referenced by execute-phase workflow
+
+**New Installer Feature:**
+- Implementation: `installer/src/{feature}.nim`
+- Entry point: Update `installer/src/gsd.nim`
 
 ## Special Directories
 
-**get-shit-done/**
-- Purpose: Resources installed to ~/.claude/
-- Source: Copied by bin/install.js during installation
-- Committed: Yes (source of truth)
+**dist/**
+- Purpose: Built binaries for distribution
+- Source: Compiled from installer/src/
+- Committed: No (gitignored)
 
-**commands/**
-- Purpose: Slash commands installed to ~/.claude/commands/
-- Source: Copied by bin/install.js during installation
+**core/**
+- Purpose: Platform-agnostic content shared across implementations
+- Source: Manually authored
+- Committed: Yes
+
+**platforms/claude/**
+- Purpose: Resources installed to ~/.claude/
+- Source: Copied by gsd binary during installation
 - Committed: Yes (source of truth)
 
 ---
 
-*Structure analysis: 2025-01-20*
+*Structure analysis: 2026-01-17*
 *Update when directory structure changes*
 ```
 </good_examples>
