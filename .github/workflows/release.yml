@@ -1,0 +1,83 @@
+name: build-release-bundles
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            bundle: gsd-darwin-arm64
+            archive: tar.gz
+          - os: macos-13
+            bundle: gsd-darwin-x64
+            archive: tar.gz
+          - os: ubuntu-latest
+            bundle: gsd-linux-x64
+            archive: tar.gz
+          - os: windows-latest
+            bundle: gsd-windows-x64
+            archive: zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nim
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: '2.0.0'
+
+      - name: Build gsd
+        run: |
+          cd installer
+          nimble build -d:release --opt:size
+
+      - name: Run tests (linux only)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd installer
+          nimble test
+
+      - name: Prepare bundle (tar.gz)
+        if: matrix.archive == 'tar.gz'
+        run: |
+          set -euo pipefail
+          BUNDLE="${{ matrix.bundle }}"
+          rm -rf "$BUNDLE"
+          mkdir -p "$BUNDLE"
+          cp installer/gsd "$BUNDLE/gsd"
+          chmod +x "$BUNDLE/gsd"
+          cp -R gsd commands agents "$BUNDLE/"
+          tar -czf "$BUNDLE.tar.gz" "$BUNDLE"
+
+      - name: Prepare bundle (zip)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $bundle = "${{ matrix.bundle }}"
+          if (Test-Path $bundle) { Remove-Item -Recurse -Force $bundle }
+          New-Item -ItemType Directory -Force -Path $bundle | Out-Null
+          Copy-Item installer\gsd.exe "$bundle\gsd.exe"
+          Copy-Item gsd -Recurse -Destination "$bundle\gsd"
+          Copy-Item commands -Recurse -Destination "$bundle\commands"
+          Copy-Item agents -Recurse -Destination "$bundle\agents"
+          Compress-Archive -Path "$bundle\*" -DestinationPath "$bundle.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.bundle }}
+          path: ${{ matrix.bundle }}.${{ matrix.archive }}
+
+      - name: Upload release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.bundle }}.${{ matrix.archive }}
