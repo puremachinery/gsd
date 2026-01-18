@@ -38,24 +38,35 @@ The prompt engineering content (commands, workflows, templates, agents) is funct
 
 ## Installation
 
-*Coming soon.* Once the Nim installer is complete, download the binary for your platform from:
+*Coming soon.* Once the Nim installer is complete, download the release bundle for your platform from:
 
 https://github.com/puremachinery/gsd/releases
 
 Then:
 
 ```bash
-# Rename the binary for your platform (example for Apple Silicon):
-mv gsd-darwin-arm64 gsd
-chmod +x gsd
+# Extract the release bundle
+tar -xzf gsd-darwin-arm64.tar.gz
+cd gsd-darwin-arm64
+
+# Install globally (to ~/.claude)
 ./gsd install --global
+
+# Or install locally (to ./.claude in current project)
+./gsd install --local
 ```
 
-Binaries will be available for:
-- macOS (Apple Silicon): `gsd-darwin-arm64`
-- macOS (Intel): `gsd-darwin-x64`
-- Linux (x64): `gsd-linux-x64`
-- Windows (x64): `gsd-windows-x64.exe`
+Release bundles will be available for:
+- macOS (Apple Silicon): `gsd-darwin-arm64.tar.gz`
+- macOS (Intel): `gsd-darwin-x64.tar.gz`
+- Linux (x64): `gsd-linux-x64.tar.gz`
+- Windows (x64): `gsd-windows-x64.zip`
+
+Each bundle contains:
+- `gsd` binary (or `gsd.exe` on Windows)
+- `gsd/` directory (templates, workflows, references)
+- `commands/` directory (slash command definitions)
+- `agents/` directory (subagent definitions)
 
 ## Core Workflow
 

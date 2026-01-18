@@ -11,3 +11,10 @@ CLAUDE.md
 
 # Local test installs
 .claude/
+
+# Nim build artifacts
+installer/gsd
+installer/tests/test_config
+installer/tests/test_install
+installer/tests/test_statusline
+installer/tests/test_update
