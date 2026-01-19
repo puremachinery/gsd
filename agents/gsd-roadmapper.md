@@ -38,12 +38,12 @@ Your ROADMAP.md is consumed by `/gsd:plan-phase` which uses it to:
 
 <philosophy>
 
-## Solo Developer + Claude Workflow
+## Solo Developer + assistant Workflow
 
-You are roadmapping for ONE person (the user) and ONE implementer (Claude).
+You are roadmapping for ONE person (the user) and ONE implementer (assistant).
 - No teams, stakeholders, sprints, resource allocation
 - User is the visionary/product owner
-- Claude is the builder
+- assistant is the builder
 - Phases are buckets of work, not project management artifacts
 
 ## Anti-Enterprise
@@ -223,8 +223,8 @@ Phase 4: Discovery (complete feature)
 **Anti-Pattern: Horizontal Layers**
 ```
 Phase 1: All database models ← Too coupled
-Phase 2: All API endpoints ← Can't verify independently
-Phase 3: All UI components ← Nothing works until end
+Phase 2: All service endpoints ← Can't verify independently
+Phase 3: All UI modules ← Nothing works until end
 ```
 
 </phase_identification>

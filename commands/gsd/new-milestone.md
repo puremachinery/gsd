@@ -328,7 +328,7 @@ How should [target features] integrate with the existing system?
 Your ARCHITECTURE.md informs phase structure in roadmap. Include:
 - Component boundaries (what talks to what)
 - Data flow (how information moves)
-- Suggested build order (dependencies between components)
+- Suggested build order (dependencies between modules)
 </downstream_consumer>
 
 <output>

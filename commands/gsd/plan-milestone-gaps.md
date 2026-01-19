@@ -72,19 +72,19 @@ Cluster related gaps into logical phases:
 
 **Grouping rules:**
 - Same affected phase → combine into one fix phase
-- Same subsystem (auth, API, UI) → combine
+- Same subsystem (auth, service, modules) → combine
 - Dependency order (fix stubs before wiring)
 - Keep phases focused: 2-4 tasks each
 
 **Example grouping:**
 ```
-Gap: DASH-01 unsatisfied (Dashboard doesn't fetch)
-Gap: Integration Phase 1→3 (Auth not passed to API calls)
-Gap: Flow "View dashboard" broken at data fetch
+Gap: DASH-01 unsatisfied (Control Panel doesn't service call)
+Gap: Integration Phase 1→3 (Auth not passed to service calls)
+Gap: Flow "View control-panel" broken at data service call
 
-→ Phase 6: "Wire Dashboard to API"
-  - Add fetch to Dashboard.tsx
-  - Include auth header in fetch
+→ Phase 6: "Wire Control Panel to service"
+  - Add service call to ControlPanel.ext
+  - Include auth header in service call
   - Handle response, update state
   - Render user data
 ```
@@ -206,26 +206,26 @@ git commit -m "docs(roadmap): add gap closure phases {N}-{M}"
 gap:
   id: DASH-01
   description: "User sees their data"
-  reason: "Dashboard exists but doesn't fetch from API"
+  reason: "Control Panel exists but doesn't service call from service"
   missing:
-    - "useEffect with fetch to /api/user/data"
+    - "lifecycle hook with service call to /service/user/data"
     - "State for user data"
     - "Render user data in JSX"
 
 becomes:
 
-phase: "Wire Dashboard Data"
+phase: "Wire Control Panel Data"
 tasks:
-  - name: "Add data fetching"
-    files: [src/components/Dashboard.tsx]
-    action: "Add useEffect that fetches /api/user/data on mount"
+  - name: "Add data calling service"
+    files: [src/modules/ControlPanel.ext]
+    action: "Add lifecycle hook that calls service /service/user/data on mount"
 
   - name: "Add state management"
-    files: [src/components/Dashboard.tsx]
-    action: "Add useState for userData, loading, error states"
+    files: [src/modules/ControlPanel.ext]
+    action: "Add stateHook for userData, loading, error states"
 
   - name: "Render user data"
-    files: [src/components/Dashboard.tsx]
+    files: [src/modules/ControlPanel.ext]
     action: "Replace placeholder with userData.map rendering"
 ```
 
@@ -234,31 +234,31 @@ tasks:
 gap:
   from_phase: 1
   to_phase: 3
-  connection: "Auth token → API calls"
-  reason: "Dashboard API calls don't include auth header"
+  connection: "Auth token → service calls"
+  reason: "Control Panel service calls don't include auth header"
   missing:
-    - "Auth header in fetch calls"
+    - "Auth header in service calls"
     - "Token refresh on 401"
 
 becomes:
 
-phase: "Add Auth to Dashboard API Calls"
+phase: "Add Auth to Control Panel service Calls"
 tasks:
-  - name: "Add auth header to fetches"
-    files: [src/components/Dashboard.tsx, src/lib/api.ts]
-    action: "Include Authorization header with token in all API calls"
+  - name: "Add auth header to calls service"
+    files: [src/modules/ControlPanel.ext, src/lib/api.ext]
+    action: "Include Authorization header with token in all service calls"
 
   - name: "Handle 401 responses"
-    files: [src/lib/api.ts]
+    files: [src/lib/api.ext]
     action: "Add interceptor to refresh token or redirect to login on 401"
 ```
 
 **Flow gap → Tasks:**
 ```yaml
 gap:
-  name: "User views dashboard after login"
-  broken_at: "Dashboard data load"
-  reason: "No fetch call"
+  name: "User views control-panel after login"
+  broken_at: "Control Panel data load"
+  reason: "No service call"
   missing:
     - "Fetch user data on mount"
     - "Display loading state"

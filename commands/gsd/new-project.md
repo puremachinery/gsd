@@ -59,8 +59,8 @@ This is the most leveraged moment in any project. Deep questioning here means be
 
 3. **Detect existing code (brownfield detection):**
    ```bash
-   CODE_FILES=$(find . -name "*.ts" -o -name "*.js" -o -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" 2>/dev/null | grep -v node_modules | grep -v .git | head -20)
-   HAS_PACKAGE=$([ -f package.json ] || [ -f requirements.txt ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f Package.swift ] && echo "yes")
+   CODE_FILES=$(find . -name "*.ext" -o -name "*.ext" -o -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" 2>/dev/null | grep -v deps | grep -v .git | head -20)
+   HAS_PACKAGE=$([ -f project.manifest ] || [ -f requirements.txt ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f Package.swift ] && echo "yes")
    HAS_CODEBASE_MAP=$([ -d .planning/codebase ] && echo "yes")
    ```
 
@@ -417,12 +417,12 @@ Project Research — Architecture dimension for [domain].
 <milestone_context>
 [greenfield OR subsequent]
 
-Greenfield: How are [domain] systems typically structured? What are major components?
+Greenfield: How are [domain] systems typically structured? What are major modules?
 Subsequent: How do [target features] integrate with existing [domain] architecture?
 </milestone_context>
 
 <question>
-How are [domain] systems typically structured? What are major components?
+How are [domain] systems typically structured? What are major modules?
 </question>
 
 <project_context>
@@ -433,7 +433,7 @@ How are [domain] systems typically structured? What are major components?
 Your ARCHITECTURE.md informs phase structure in roadmap. Include:
 - Component boundaries (what talks to what)
 - Data flow (how information moves)
-- Suggested build order (dependencies between components)
+- Suggested build order (dependencies between modules)
 </downstream_consumer>
 
 <quality_gate>

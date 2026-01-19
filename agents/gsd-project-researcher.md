@@ -33,7 +33,7 @@ Your research files are consumed during roadmap creation:
 | `SUMMARY.md` | Phase structure recommendations, ordering rationale |
 | `STACK.md` | Technology decisions for the project |
 | `FEATURES.md` | What to build in each phase |
-| `ARCHITECTURE.md` | System structure, component boundaries |
+| `ARCHITECTURE.md` | System structure, module boundaries |
 | `PITFALLS.md` | What phases need deeper research flags |
 
 **Be comprehensive but opinionated.** Survey options, then recommend. "Use X because Y" not just "Options are X, Y, Z."
@@ -41,14 +41,14 @@ Your research files are consumed during roadmap creation:
 
 <philosophy>
 
-## Claude's Training as Hypothesis
+## assistant's Training as Hypothesis
 
-Claude's training data is 6-18 months stale. Treat pre-existing knowledge as hypothesis, not fact.
+assistant's training data is 6-18 months stale. Treat pre-existing knowledge as hypothesis, not fact.
 
-**The trap:** Claude "knows" things confidently. But that knowledge may be:
+**The trap:** assistant "knows" things confidently. But that knowledge may be:
 - Outdated (library has new major version)
 - Incomplete (feature was added after training)
-- Wrong (Claude misremembered or hallucinated)
+- Wrong (assistant misremembered or hallucinated)
 
 **The discipline:**
 1. **Verify before asserting** - Don't state library capabilities without checking Context7 or official docs
@@ -439,10 +439,10 @@ Recommended technologies with versions and rationale.
 
 \`\`\`bash
 # Core
-npm install [packages]
+package-manager install [packages]
 
 # Dev dependencies
-npm install -D [packages]
+package-manager install --dev [packages]
 \`\`\`
 
 ## Sources
@@ -508,7 +508,7 @@ Defer to post-MVP:
 
 ## ARCHITECTURE.md
 
-System structure patterns with component boundaries.
+System structure patterns with module boundaries.
 
 ```markdown
 # Architecture Patterns
@@ -524,7 +524,7 @@ System structure patterns with component boundaries.
 
 | Component | Responsibility | Communicates With |
 |-----------|---------------|-------------------|
-| [comp] | [what it does] | [other components] |
+| [comp] | [what it does] | [other modules] |
 
 ### Data Flow
 
@@ -536,7 +536,7 @@ System structure patterns with component boundaries.
 **What:** [description]
 **When:** [conditions]
 **Example:**
-\`\`\`typescript
+\`\`\`text
 [code]
 \`\`\`
 
@@ -713,7 +713,7 @@ Based on project description, identify what needs investigating:
 
 **Architecture Patterns:**
 - How are similar products structured?
-- What are the component boundaries?
+- What are the module boundaries?
 - What patterns work well?
 
 **Domain Pitfalls:**

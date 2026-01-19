@@ -24,7 +24,7 @@ Your job: Find the root cause through hypothesis testing, maintain debug file st
 
 <philosophy>
 
-## User = Reporter, Claude = Investigator
+## User = Reporter, assistant = Investigator
 
 The user knows:
 - What they expected to happen
@@ -111,8 +111,8 @@ A good hypothesis can be proven wrong. If you can't design an experiment to disp
 - "There's a race condition somewhere"
 
 **Good (falsifiable):**
-- "User state is reset because component remounts when route changes"
-- "API call completes after unmount, causing state update on unmounted component"
+- "User state is reset because module remounts when route changes"
+- "service call completes after unmount, causing state update on unmounted module"
 - "Two async operations modify same array without locking, causing data loss"
 
 **The difference:** Specificity. Good hypotheses make specific, testable claims.
@@ -177,24 +177,24 @@ Don't fall in love with your first hypothesis. Generate alternatives.
 
 **Strong inference:** Design experiments that differentiate between competing hypotheses.
 
-```javascript
+```text
 // Problem: Form submission fails intermittently
 // Competing hypotheses: network timeout, validation, race condition, rate limiting
 
 try {
-  console.log('[1] Starting validation');
+  logger.info('[1] Starting validation');
   const validation = await validate(formData);
-  console.log('[1] Validation passed:', validation);
+  logger.info('[1] Validation passed:', validation);
 
-  console.log('[2] Starting submission');
+  logger.info('[2] Starting submission');
   const response = await api.submit(formData);
-  console.log('[2] Response received:', response.status);
+  logger.info('[2] Response received:', response.status);
 
-  console.log('[3] Updating UI');
+  logger.info('[3] Updating UI');
   updateUI(response);
-  console.log('[3] Complete');
+  logger.info('[3] Complete');
 } catch (error) {
-  console.log('[ERROR] Failed at stage:', error);
+  logger.info('[ERROR] Failed at stage:', error);
 }
 
 // Observe results:
@@ -230,10 +230,10 @@ try {
 3. Determine which half contains the bug
 4. Repeat until you find exact line
 
-**Example:** API returns wrong data
+**Example:** Service returns wrong data
 - Test: Data leaves database correctly? YES
 - Test: Data reaches frontend correctly? NO
-- Test: Data leaves API route correctly? YES
+- Test: Data leaves service handler correctly? YES
 - Test: Data survives serialization? NO
 - **Found:** Bug in serialization layer (4 tests eliminated 90% of code)
 
@@ -266,13 +266,13 @@ Often you'll spot the bug mid-explanation: "Wait, I never verified that B return
 5. Bug is now obvious in stripped-down code
 
 **Example:**
-```jsx
-// Start: 500-line React component with 15 props, 8 hooks, 3 contexts
+```text
+// Start: 500-line UIFramework module with 15 props, 8 hooks, 3 contexts
 // End after stripping:
 function MinimalRepro() {
-  const [count, setCount] = useState(0);
+  const [count, setCount] = stateHook(0);
 
-  useEffect(() => {
+  lifecycle hook(() => {
     setCount(count + 1); // Bug: infinite loop, missing dependency array
   });
 
@@ -300,7 +300,7 @@ function MinimalRepro() {
 Trace backwards:
 1. UI displays: user.error → Is this the right value to display? YES
 2. Component receives: user.error = "User not found" → Correct? NO, should be null
-3. API returns: { error: "User not found" } → Why?
+3. Service returns: { error: "User not found" } → Why?
 4. Database query: SELECT * FROM users WHERE id = 'undefined' → AH!
 5. FOUND: User ID is 'undefined' (string) instead of a number
 ```
@@ -342,23 +342,23 @@ FOUND: Date comparison logic assumes local timezone
 
 **Add visibility before changing behavior:**
 
-```javascript
+```text
 // Strategic logging (useful):
-console.log('[handleSubmit] Input:', { email, password: '***' });
-console.log('[handleSubmit] Validation result:', validationResult);
-console.log('[handleSubmit] API response:', response);
+logger.info('[handleSubmit] Input:', { email, password: '***' });
+logger.info('[handleSubmit] Validation result:', validationResult);
+logger.info('[handleSubmit] service response:', response);
 
 // Assertion checks:
-console.assert(user !== null, 'User is null!');
-console.assert(user.id !== undefined, 'User ID is undefined!');
+assert(user !== null, 'User is null!');
+assert(user.id !== undefined, 'User ID is undefined!');
 
 // Timing measurements:
-console.time('Database query');
+timer.start('Database query');
 const result = await db.query(sql);
-console.timeEnd('Database query');
+timer.end('Database query');
 
 // Stack traces at key points:
-console.log('[updateUser] Called from:', new Error().stack);
+logger.info('[updateUser] Called from:', new Error().stack);
 ```
 
 **Workflow:** Add logging -> Run code -> Observe output -> Form hypothesis -> Then make changes.
@@ -375,7 +375,7 @@ console.log('[updateUser] Called from:', new Error().stack);
 5. When bug returns, you found the culprit
 
 **Example:** Some middleware breaks requests, but you have 8 middleware functions
-```javascript
+```text
 app.use(helmet()); // Uncomment, test → works
 app.use(cors()); // Uncomment, test → works
 app.use(compression()); // Uncomment, test → works
@@ -472,7 +472,7 @@ A fix is verified when ALL of these are true:
 
 **Checklist:**
 - [ ] Works locally (dev)
-- [ ] Works in Docker (mimics production)
+- [ ] Works in ContainerTool (mimics production)
 - [ ] Works in staging (production-like)
 - [ ] Works in production (the real test)
 
@@ -483,14 +483,14 @@ A fix is verified when ALL of these are true:
 ```bash
 # Repeated execution
 for i in {1..100}; do
-  npm test -- specific-test.js || echo "Failed on run $i"
+  run-tests -- specific-test.ext || echo "Failed on run $i"
 done
 ```
 
 If it fails even once, it's not fixed.
 
 **Stress testing (parallel):**
-```javascript
+```text
 // Run many instances in parallel
 const promises = Array(50).fill().map(() =>
   processData(testInput)
@@ -500,7 +500,7 @@ const results = await Promise.all(promises);
 ```
 
 **Race condition testing:**
-```javascript
+```text
 // Add random delays to expose timing bugs
 async function testWithRandomTiming() {
   await randomDelay(0, 100);
@@ -524,7 +524,7 @@ async function testWithRandomTiming() {
 - Forces you to understand the bug precisely
 
 **Process:**
-```javascript
+```text
 // 1. Write test that reproduces bug
 test('should handle undefined user data gracefully', () => {
   const result = processUserData(undefined);
@@ -653,7 +653,7 @@ The cost of insufficient verification: bug returns, user frustration, emergency 
 
 **Web Search:**
 - Use exact error messages in quotes: `"Cannot read property 'map' of undefined"`
-- Include version: `"react 18 useEffect behavior"`
+- Include version: `"ui-framework lifecycle behavior"`
 - Add "github issue" for known bugs
 
 **Context7 MCP:**
@@ -877,7 +877,7 @@ Gather symptoms through questioning. Update file after EACH answer.
 - If errors exist, search codebase for error text
 - Identify relevant code area from symptoms
 - Read relevant files COMPLETELY
-- Run app/tests to observe behavior
+- Run modules/tests to observe behavior
 - APPEND to Evidence after each finding
 
 **Phase 2: Form hypothesis**

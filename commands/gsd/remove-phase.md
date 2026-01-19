@@ -165,8 +165,8 @@ Rename all subsequent phase directories:
 For each phase directory that needs renumbering (in reverse order to avoid conflicts):
 
 ```bash
-# Example: renaming 18-dashboard to 17-dashboard
-mv ".planning/phases/18-dashboard" ".planning/phases/17-dashboard"
+# Example: renaming 18-control-panel to 17-control-panel
+mv ".planning/phases/18-control-panel" ".planning/phases/17-control-panel"
 ```
 
 Process in descending order (20→19, then 19→18, then 18→17) to avoid overwriting.
@@ -182,7 +182,7 @@ Rename plan files inside renumbered directories:
 For each renumbered directory, rename files that contain the phase number:
 
 ```bash
-# Inside 17-dashboard (was 18-dashboard):
+# Inside 17-control-panel (was 18-control-panel):
 mv "18-01-PLAN.md" "17-01-PLAN.md"
 mv "18-02-PLAN.md" "17-02-PLAN.md"
 mv "18-01-SUMMARY.md" "17-01-SUMMARY.md"  # if exists
@@ -207,7 +207,7 @@ Update ROADMAP.md:
 4. **Renumber all subsequent phases:**
    - `### Phase 18:` → `### Phase 17:`
    - `- [ ] **Phase 18:` → `- [ ] **Phase 17:`
-   - Table rows: `| 18. Dashboard |` → `| 17. Dashboard |`
+   - Table rows: `| 18. Control Panel |` → `| 17. Control Panel |`
    - Plan references: `18-01:` → `17-01:`
 
 5. **Update dependency references:**

@@ -56,8 +56,8 @@ Infer area from file paths:
 
 | Path pattern | Area |
 |--------------|------|
-| `src/api/*`, `api/*` | `api` |
-| `src/components/*`, `src/ui/*` | `ui` |
+| `src/services/*`, `service/*` | `api` |
+| `src/modules/*`, `src/ui/*` | `ui` |
 | `src/auth/*`, `auth/*` | `auth` |
 | `src/db/*`, `database/*` | `database` |
 | `tests/*`, `__tests__/*` | `testing` |
@@ -108,7 +108,7 @@ files:
 
 ## Problem
 
-[problem description - enough context for future Claude to understand weeks later]
+[problem description - enough context for future assistant to understand weeks later]
 
 ## Solution
 
@@ -174,7 +174,7 @@ Would you like to:
 <success_criteria>
 - [ ] Directory structure exists
 - [ ] Todo file created with valid frontmatter
-- [ ] Problem section has enough context for future Claude
+- [ ] Problem section has enough context for future assistant
 - [ ] No duplicates (checked and resolved)
 - [ ] Area consistent with existing todos
 - [ ] STATE.md updated if exists

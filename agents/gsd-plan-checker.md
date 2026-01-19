@@ -148,14 +148,14 @@ issue:
 
 **Red flags:**
 - Component created but not imported anywhere
-- API route created but component doesn't call it
-- Database model created but API doesn't query it
+- service handler created but module doesn't call it
+- Database model created but service doesn't query it
 - Form created but submit handler is missing or stub
 
 **What to check:**
 ```
-Component -> API: Does action mention fetch/axios call?
-API -> Database: Does action mention Prisma/query?
+Module -> Service: Does action mention callService/clientCall call?
+Service -> Database: Does action mention ORMTool/query?
 Form -> Handler: Does action mention onSubmit implementation?
 State -> Render: Does action mention displaying state?
 ```
@@ -165,10 +165,10 @@ State -> Render: Does action mention displaying state?
 issue:
   dimension: key_links_planned
   severity: warning
-  description: "Chat.tsx created but no task wires it to /api/chat"
+  description: "Chat.ext created but no task wires it to /service/chat"
   plan: "01"
-  artifacts: ["src/components/Chat.tsx", "src/app/api/chat/route.ts"]
-  fix_hint: "Add fetch call in Chat.tsx action or create wiring task"
+  artifacts: ["src/modules/Chat.ext", "src/services/chat/handler.ext"]
+  fix_hint: "Add service call in Chat.ext action or create wiring task"
 ```
 
 ## Dimension 5: Scope Sanity
@@ -231,7 +231,7 @@ issue:
   plan: "02"
   problematic_truths:
     - "JWT library installed"
-    - "Prisma schema updated"
+    - "ORMTool schema updated"
   fix_hint: "Reframe as user-observable: 'User can log in', 'Session persists'"
 ```
 
@@ -292,13 +292,13 @@ must_haves:
     - "User can log in with email/password"
     - "Invalid credentials return 401"
   artifacts:
-    - path: "src/app/api/auth/login/route.ts"
+    - path: "src/services/auth/login/handler.ext"
       provides: "Login endpoint"
       min_lines: 30
   key_links:
-    - from: "src/components/LoginForm.tsx"
-      to: "/api/auth/login"
-      via: "fetch in onSubmit"
+    - from: "src/modules/LoginForm.ext"
+      to: "/service/auth/login"
+      via: "service call in onSubmit"
 ```
 
 **Aggregate across plans** to get full picture of what phase delivers.
@@ -371,9 +371,9 @@ Verify artifacts are wired together in task actions.
 
 **Example check:**
 ```
-key_link: Chat.tsx -> /api/chat via fetch
-Task 2 action: "Create Chat component with message list..."
-Missing: No mention of fetch/API call in action
+key_link: Chat.ext -> /service/chat via service call
+Task 2 action: "Create Chat module with message list..."
+Missing: No mention of service call/service call in action
 Issue: Key link not planned
 ```
 
@@ -411,7 +411,7 @@ Check that must_haves are properly derived from phase goal.
 
 **Key_links should:**
 - Connect artifacts that must work together
-- Specify the connection method (fetch, Prisma query, import)
+- Specify the connection method (service call, ORMTool query, import)
 - Cover critical wiring (where stubs hide)
 
 ## Step 10: Determine Overall Status
@@ -501,7 +501,7 @@ issue:
 ```xml
 <task type="auto">
   <name>Task 2: Create login endpoint</name>
-  <files>src/app/api/auth/login/route.ts</files>
+  <files>src/services/auth/login/handler.ext</files>
   <action>POST endpoint accepting {email, password}, validates using bcrypt...</action>
   <!-- Missing <verify> -->
   <done>Login works with valid credentials</done>
@@ -531,18 +531,18 @@ issue:
 ```
 Tasks: 5
 Files modified: 12
-  - prisma/schema.prisma
-  - src/app/api/auth/login/route.ts
-  - src/app/api/auth/logout/route.ts
-  - src/app/api/auth/refresh/route.ts
-  - src/middleware.ts
-  - src/lib/auth.ts
-  - src/lib/jwt.ts
-  - src/components/LoginForm.tsx
-  - src/components/LogoutButton.tsx
-  - src/app/login/page.tsx
-  - src/app/dashboard/page.tsx
-  - src/types/auth.ts
+  - orm/schema.orm
+  - src/services/auth/login/handler.ext
+  - src/services/auth/logout/handler.ext
+  - src/services/auth/refresh/handler.ext
+  - src/middleware.ext
+  - src/lib/auth.ext
+  - src/lib/jwt.ext
+  - src/modules/LoginForm.ext
+  - src/modules/LogoutButton.ext
+  - src/modules/login/entry.ext
+  - src/modules/control-panel/entry.ext
+  - src/types/auth.ext
 ```
 
 **Analysis:**
@@ -562,7 +562,7 @@ issue:
     tasks: 5
     files: 12
     estimated_context: "~80%"
-  fix_hint: "Split into: 01 (schema + API), 02 (middleware + lib), 03 (UI components)"
+  fix_hint: "Split into: 01 (schema + service), 02 (middleware + lib), 03 (UI modules)"
 ```
 
 </examples>
@@ -711,7 +711,7 @@ issues:
 
 **DO NOT check code existence.** That's gsd-verifier's job after execution. You verify plans, not codebase.
 
-**DO NOT run the application.** This is static plan analysis. No `npm start`, no `curl` to running server.
+**DO NOT run the application.** This is static plan analysis. No `run the app`, no `curl` to running server.
 
 **DO NOT accept vague tasks.** "Implement auth" is not specific enough. Tasks need concrete files, actions, verification.
 

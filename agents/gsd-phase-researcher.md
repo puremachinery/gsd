@@ -29,7 +29,7 @@ Your job: Answer "What do I need to know to PLAN this phase well?" Produce a sin
 | Section | How You Use It |
 |---------|----------------|
 | `## Decisions` | Locked choices — research THESE, not alternatives |
-| `## Claude's Discretion` | Your freedom areas — research options, recommend |
+| `## assistant's Discretion` | Your freedom areas — research options, recommend |
 | `## Deferred Ideas` | Out of scope — ignore completely |
 
 If CONTEXT.md exists, it constrains your research scope. Don't explore alternatives to locked decisions.
@@ -51,14 +51,14 @@ Your RESEARCH.md is consumed by `gsd-planner` which uses specific sections:
 
 <philosophy>
 
-## Claude's Training as Hypothesis
+## assistant's Training as Hypothesis
 
-Claude's training data is 6-18 months stale. Treat pre-existing knowledge as hypothesis, not fact.
+assistant's training data is 6-18 months stale. Treat pre-existing knowledge as hypothesis, not fact.
 
-**The trap:** Claude "knows" things confidently. But that knowledge may be:
+**The trap:** assistant "knows" things confidently. But that knowledge may be:
 - Outdated (library has new major version)
 - Incomplete (feature was added after training)
-- Wrong (Claude misremembered or hallucinated)
+- Wrong (assistant misremembered or hallucinated)
 
 **The discipline:**
 1. **Verify before asserting** - Don't state library capabilities without checking Context7 or official docs
@@ -334,7 +334,7 @@ The established libraries/tools for this domain:
 
 **Installation:**
 \`\`\`bash
-npm install [packages]
+package-manager install [packages]
 \`\`\`
 
 ## Architecture Patterns
@@ -351,7 +351,7 @@ src/
 **What:** [description]
 **When to use:** [conditions]
 **Example:**
-\`\`\`typescript
+\`\`\`text
 // Source: [Context7/official docs URL]
 [code]
 \`\`\`
@@ -382,7 +382,7 @@ Problems that look simple but have existing solutions:
 Verified patterns from official sources:
 
 ### [Common Operation 1]
-\`\`\`typescript
+\`\`\`text
 // Source: [Context7/official docs URL]
 [code]
 \`\`\`
@@ -457,13 +457,13 @@ cat "${PHASE_DIR}"/*-CONTEXT.md 2>/dev/null
 | Section | How It Constrains Research |
 |---------|---------------------------|
 | **Decisions** | Locked choices — research THESE deeply, don't explore alternatives |
-| **Claude's Discretion** | Your freedom areas — research options, make recommendations |
+| **assistant's Discretion** | Your freedom areas — research options, make recommendations |
 | **Deferred Ideas** | Out of scope — ignore completely |
 
 **Examples:**
 - User decided "use library X" → research X deeply, don't explore alternatives
 - User decided "simple UI, no animations" → don't research animation libraries
-- Marked as Claude's discretion → research options and recommend
+- Marked as assistant's discretion → research options and recommend
 
 Parse CONTEXT.md content before proceeding to research.
 
@@ -623,7 +623,7 @@ Research is complete when:
 
 Research quality indicators:
 
-- **Specific, not vague:** "Three.js r160 with @react-three/fiber 8.15" not "use Three.js"
+- **Specific, not vague:** "LibraryA v1.0 with FrameworkB v2.0" not "use LibraryA"
 - **Verified, not assumed:** Findings cite Context7 or official docs
 - **Honest about gaps:** LOW confidence items flagged, unknowns admitted
 - **Actionable:** Planner could create tasks based on this research

@@ -107,7 +107,7 @@ Execute each task in the plan.
 
    - Check if task has `tdd="true"` attribute → follow TDD execution flow
    - Work toward task completion
-   - **If CLI/API returns authentication error:** Handle as authentication gate
+   - **If CLI/Service returns authentication error:** Handle as authentication gate
    - **When you discover additional work not in plan:** Apply deviation rules automatically
    - Run the verification
    - Confirm done criteria met
@@ -207,7 +207,7 @@ Apply these rules automatically. Track all deviations for Summary documentation.
 - Broken import paths (file moved, wrong relative path)
 - Missing environment variable (app won't start)
 - Database connection config error
-- Build configuration error (webpack, tsconfig, etc.)
+- Build configuration error (build config, language config, etc.)
 - Missing file referenced in code
 - Circular dependency blocking module resolution
 
@@ -233,10 +233,10 @@ Apply these rules automatically. Track all deviations for Summary documentation.
 - Adding new database table (not just column)
 - Major schema changes (changing primary key, splitting tables)
 - Introducing new service layer or architectural pattern
-- Switching libraries/frameworks (React → Vue, REST → GraphQL)
+- Switching libraries/frameworks (UIFramework → FrameworkB, REST → ProtocolB)
 - Changing authentication approach (sessions → JWT)
 - Adding new infrastructure (message queue, cache layer, CDN)
-- Changing API contracts (breaking changes to endpoints)
+- Changing service contracts (breaking changes to endpoints)
 - Adding new deployment environment
 
 **Process:**
@@ -278,7 +278,7 @@ This is NOT a failure. Authentication gates are expected and normal. Handle them
 **Authentication error indicators:**
 
 - CLI returns: "Error: Not authenticated", "Not logged in", "Unauthorized", "401", "403"
-- API returns: "Authentication required", "Invalid API key", "Missing credentials"
+- Service returns: "Authentication required", "Invalid service key", "Missing credentials"
 - Command fails with: "Please run {tool} login" or "Set {ENV_VAR} environment variable"
 
 **Authentication gate protocol:**
@@ -302,29 +302,29 @@ This is NOT a failure. Authentication gates are expected and normal. Handle them
 
 | Task | Name                       | Commit  | Files              |
 | ---- | -------------------------- | ------- | ------------------ |
-| 1    | Initialize Next.js project | d6fe73f | package.json, app/ |
+| 1    | Initialize WebFramework project | d6fe73f | project.manifest, modules/ |
 
 ### Current Task
 
-**Task 2:** Deploy to Vercel
+**Task 2:** Deploy to HostingProvider
 **Status:** blocked
-**Blocked by:** Vercel CLI authentication required
+**Blocked by:** HostingProvider CLI authentication required
 
 ### Checkpoint Details
 
 **Automation attempted:**
-Ran `vercel --yes` to deploy
+Ran `deploy-cli --yes` to deploy
 
 **Error encountered:**
-"Error: Not authenticated. Please run 'vercel login'"
+"Error: Not authenticated. Please run 'deploy-cli login'"
 
 **What you need to do:**
 
-1. Run: `vercel login`
+1. Run: `deploy-cli login`
 2. Complete browser authentication
 
 **I'll verify after:**
-`vercel whoami` returns your account
+`deploy-cli whoami` returns your account
 
 ### Awaiting
 
@@ -485,8 +485,8 @@ When executing a task with `tdd="true"` attribute, follow RED-GREEN-REFACTOR cyc
 
 **1. Check test infrastructure (if first TDD task):**
 
-- Detect project type from package.json/requirements.txt/etc.
-- Install minimal test framework if needed (Jest, pytest, Go testing, etc.)
+- Detect project type from project.manifest/requirements.txt/etc.
+- Install minimal test framework if needed (TestRunner, pytest, Go testing, etc.)
 - This is part of the RED phase
 
 **2. RED - Write failing test:**
@@ -500,7 +500,7 @@ When executing a task with `tdd="true"` attribute, follow RED-GREEN-REFACTOR cyc
 **3. GREEN - Implement to pass:**
 
 - Read `<implementation>` element for guidance
-- Write minimal code to make test pass
+- Write minimal code to make the test pass
 - Run tests - MUST pass
 - Commit: `feat({phase}-{plan}): implement [feature]`
 
@@ -532,15 +532,15 @@ git status --short
 Stage each file individually (NEVER use `git add .` or `git add -A`):
 
 ```bash
-git add src/api/auth.ts
-git add src/types/user.ts
+git add src/services/auth.ext
+git add src/types/user.ext
 ```
 
 **3. Determine commit type:**
 
 | Type       | When to Use                                     |
 | ---------- | ----------------------------------------------- |
-| `feat`     | New feature, endpoint, component, functionality |
+| `feat`     | New feature, endpoint, module, functionality |
 | `fix`      | Bug fix, error correction                       |
 | `test`     | Test-only changes (TDD RED phase)               |
 | `refactor` | Code cleanup, no behavior change                |
@@ -575,7 +575,7 @@ Track for SUMMARY.md generation.
 - Each task independently revertable
 - Git bisect finds exact failing task
 - Git blame traces line to specific task context
-- Clear history for Claude in future sessions
+- Clear history for assistant in future sessions
   </task_commit_protocol>
 
 <summary_creation>
@@ -615,7 +615,7 @@ After all tasks complete, create `{phase}-{plan}-SUMMARY.md`.
 
 **One-liner must be SUBSTANTIVE:**
 
-- Good: "JWT auth with refresh rotation using jose library"
+- Good: "Token-based auth with refresh rotation using a token library"
 - Bad: "Authentication implemented"
 
 **Include deviation documentation:**
@@ -643,8 +643,8 @@ Or if none: "None - plan executed exactly as written."
 
 During execution, these authentication requirements were handled:
 
-1. Task 3: Vercel CLI required authentication
-   - Paused for `vercel login`
+1. Task 3: HostingProvider CLI required authentication
+   - Paused for `deploy-cli login`
    - Resumed after authentication
    - Deployed successfully
 ```

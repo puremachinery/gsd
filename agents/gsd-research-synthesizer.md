@@ -53,7 +53,7 @@ cat .planning/research/PITFALLS.md
 Parse each file to extract:
 - **STACK.md:** Recommended technologies, versions, rationale
 - **FEATURES.md:** Table stakes, differentiators, anti-features
-- **ARCHITECTURE.md:** Patterns, component boundaries, data flow
+- **ARCHITECTURE.md:** Patterns, module boundaries, data flow
 - **PITFALLS.md:** Critical/moderate/minor pitfalls, phase warnings
 
 ## Step 2: Synthesize Executive Summary
@@ -79,7 +79,7 @@ For each research file, pull out the most important points:
 - What to defer to v2+
 
 **From ARCHITECTURE.md:**
-- Major components and their responsibilities
+- Major modules and their responsibilities
 - Key patterns to follow
 
 **From PITFALLS.md:**

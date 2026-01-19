@@ -201,7 +201,7 @@ Check if `{phase}-CONTEXT.md` exists in phase directory.
 
 **Also available:**
 - `/gsd:plan-phase {phase}` — skip discussion, plan directly
-- `/gsd:list-phase-assumptions {phase}` — see Claude's assumptions
+- `/gsd:list-phase-assumptions {phase}` — see assistant's assumptions
 
 ---
 ```

@@ -80,7 +80,7 @@ Task(
 
 Phases: {phase_dirs}
 Phase exports: {from SUMMARYs}
-API routes: {routes created}
+service handlers: {routes created}
 
 Verify cross-phase wiring and E2E user flows.",
   subagent_type="gsd-integration-checker"
@@ -123,7 +123,7 @@ tech_debt:  # Non-critical, deferred
     items:
       - "TODO: add rate limiting"
       - "Warning: no password strength validation"
-  - phase: 03-dashboard
+  - phase: 03-control-panel
     items:
       - "Deferred: mobile responsive layout"
 ---
