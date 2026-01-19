@@ -5,8 +5,8 @@
 1. `.planning/STATE.md`
 2. `.planning/PROJECT.md`
 3. `.planning/ROADMAP.md`
-4. Current phase's plan files (`*-PLAN.md`)
-5. Current phase's summary files (`*-SUMMARY.md`)
+4. Current phase plan files (`*-PLAN.md`)
+5. Current phase summary files (`*-SUMMARY.md`)
 
 </required_reading>
 
@@ -50,41 +50,14 @@ ls .planning/phases/XX-current/*-SUMMARY.md 2>/dev/null | sort
 - If counts match: all plans complete
 - If counts don't match: incomplete
 
-<config-check>
-
-```bash
-cat .planning/config.json 2>/dev/null
-```
-
-</config-check>
-
 **If all plans complete:**
 
-<if mode="yolo">
-
-```
-⚡ Auto-approved: Transition Phase [X] → Phase [X+1]
-Phase [X] complete — all [Y] plans finished.
-
-Proceeding to mark done and advance...
-```
-
-Proceed directly to cleanup_handoff step.
-
-</if>
-
-<if mode="interactive" OR="custom with gates.confirm_transition true">
-
-Ask: "Phase [X] complete — all [Y] plans finished. Ready to mark done and move to Phase [X+1]?"
-
-Wait for confirmation before proceeding.
-
-</if>
+- In auto mode: proceed to cleanup_handoff
+- In interactive mode: confirm transition
 
 **If plans incomplete:**
 
-**SAFETY RAIL: always_confirm_destructive applies here.**
-Skipping incomplete plans is destructive — ALWAYS prompt regardless of mode.
+Skipping incomplete plans is destructive. ALWAYS prompt regardless of mode.
 
 Present:
 
@@ -93,8 +66,6 @@ Phase [X] has incomplete plans:
 - {phase}-01-SUMMARY.md ✓ Complete
 - {phase}-02-SUMMARY.md ✗ Missing
 - {phase}-03-SUMMARY.md ✗ Missing
-
-⚠️ Safety rail: Skipping plans requires confirmation (destructive action)
 
 Options:
 1. Continue current phase (execute remaining plans)
@@ -140,7 +111,7 @@ Update the file:
 ## Phases
 
 - [x] Phase 1: Foundation (completed 2025-01-15)
-- [ ] Phase 2: Authentication ← Next
+- [ ] Phase 2: Authentication <- Next
 - [ ] Phase 3: Core Features
 
 ## Progress
@@ -151,13 +122,6 @@ Update the file:
 | 2. Authentication | 0/2            | Not started | -          |
 | 3. Core Features  | 0/1            | Not started | -          |
 ```
-
-</step>
-
-<step name="archive_prompts">
-
-If prompts were generated for the phase, they stay in place.
-The `completed/` subfolder pattern from create-meta-prompts handles archival.
 
 </step>
 
@@ -202,40 +166,6 @@ Make the edits inline. Update "Last updated" footer:
 *Last updated: [date] after Phase [X]*
 ```
 
-**Example evolution:**
-
-Before:
-
-```markdown
-### Active
-
-- [ ] JWT authentication
-- [ ] Real-time sync < 500ms
-- [ ] Offline mode
-
-### Out of Scope
-
-- OAuth2 — complexity not needed for v1
-```
-
-After (Phase 2 shipped JWT auth, discovered rate limiting needed):
-
-```markdown
-### Validated
-
-- ✓ JWT authentication — Phase 2
-
-### Active
-
-- [ ] Real-time sync < 500ms
-- [ ] Offline mode
-- [ ] Rate limiting on sync endpoint
-
-### Out of Scope
-
-- OAuth2 — complexity not needed for v1
-```
-
 **Step complete when:**
 
 - [ ] Phase summaries reviewed for learnings
@@ -248,11 +178,11 @@ After (Phase 2 shipped JWT auth, discovered rate limiting needed):
 
 </step>
 
-<step name="update_current_position_after_transition">
+<step name="update_state">
 
-Update Current Position section in STATE.md to reflect phase completion and transition.
+Update STATE.md to reflect phase completion and transition.
 
-**Format:**
+**Current Position format:**
 
 ```markdown
 Phase: [next] of [total] ([Next phase name])
@@ -263,55 +193,7 @@ Last activity: [today] — Phase [X] complete, transitioned to Phase [X+1]
 Progress: [updated progress bar]
 ```
 
-**Instructions:**
-
-- Increment phase number to next phase
-- Reset plan to "Not started"
-- Set status to "Ready to plan"
-- Update last activity to describe transition
-- Recalculate progress bar based on completed plans
-
-**Example — transitioning from Phase 2 to Phase 3:**
-
-Before:
-
-```markdown
-## Current Position
-
-Phase: 2 of 4 (Authentication)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2025-01-20 — Completed 02-02-PLAN.md
-
-Progress: ███████░░░ 60%
-```
-
-After:
-
-```markdown
-## Current Position
-
-Phase: 3 of 4 (Core Features)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2025-01-20 — Phase 2 complete, transitioned to Phase 3
-
-Progress: ███████░░░ 60%
-```
-
-**Step complete when:**
-
-- [ ] Phase number incremented to next phase
-- [ ] Plan status reset to "Not started"
-- [ ] Status shows "Ready to plan"
-- [ ] Last activity describes the transition
-- [ ] Progress bar reflects total completed plans
-
-</step>
-
-<step name="update_project_reference">
-
-Update Project Reference section in STATE.md.
+**Project Reference format:**
 
 ```markdown
 ## Project Reference
@@ -322,59 +204,13 @@ See: .planning/PROJECT.md (updated [today])
 **Current focus:** [Next phase name]
 ```
 
-Update the date and current focus to reflect the transition.
-
-</step>
-
-<step name="review_accumulated_context">
-
-Review and update Accumulated Context section in STATE.md.
-
-**Decisions:**
+**Accumulated Context:**
 
 - Note recent decisions from this phase (3-5 max)
-- Full log lives in PROJECT.md Key Decisions table
-
-**Blockers/Concerns:**
-
-- Review blockers from completed phase
-- If addressed in this phase: Remove from list
-- If still relevant for future: Keep with "Phase X" prefix
+- Remove resolved blockers, keep unresolved with phase prefix
 - Add any new concerns from completed phase's summaries
 
-**Example:**
-
-Before:
-
-```markdown
-### Blockers/Concerns
-
-- ⚠️ [Phase 1] Database schema not indexed for common queries
-- ⚠️ [Phase 2] WebSocket reconnection behavior on flaky networks unknown
-```
-
-After (if database indexing was addressed in Phase 2):
-
-```markdown
-### Blockers/Concerns
-
-- ⚠️ [Phase 2] WebSocket reconnection behavior on flaky networks unknown
-```
-
-**Step complete when:**
-
-- [ ] Recent decisions noted (full log in PROJECT.md)
-- [ ] Resolved blockers removed from list
-- [ ] Unresolved blockers kept with phase prefix
-- [ ] New concerns from completed phase added
-
-</step>
-
-<step name="update_session_continuity_after_transition">
-
-Update Session Continuity section in STATE.md to reflect transition completion.
-
-**Format:**
+**Session Continuity:**
 
 ```markdown
 Last session: [today]
@@ -382,132 +218,36 @@ Stopped at: Phase [X] complete, ready to plan Phase [X+1]
 Resume file: None
 ```
 
-**Step complete when:**
-
-- [ ] Last session timestamp updated to current date and time
-- [ ] Stopped at describes phase completion and next phase
-- [ ] Resume file confirmed as None (transitions don't use resume files)
-
 </step>
 
 <step name="offer_next_phase">
 
-**MANDATORY: Verify milestone status before presenting next steps.**
+**Verify milestone status before presenting next steps.**
 
 **Step 1: Read ROADMAP.md and identify phases in current milestone**
 
-Read the ROADMAP.md file and extract:
+Read ROADMAP.md and extract:
 1. Current phase number (the phase just transitioned from)
 2. All phase numbers in the current milestone section
 
-To find phases, look for:
-- Phase headers: lines starting with `### Phase` or `#### Phase`
-- Phase list items: lines like `- [ ] **Phase X:` or `- [x] **Phase X:`
-
 Count total phases and identify the highest phase number in the milestone.
-
-State: "Current phase is {X}. Milestone has {N} phases (highest: {Y})."
 
 **Step 2: Route based on milestone status**
 
 | Condition | Meaning | Action |
 |-----------|---------|--------|
-| current phase < highest phase | More phases remain | Go to **Route A** |
-| current phase = highest phase | Milestone complete | Go to **Route B** |
-
----
+| current phase < highest phase | More phases remain | Offer next phase planning | 
+| current phase = highest phase | Milestone complete | Offer milestone completion | 
 
 **Route A: More phases remain in milestone**
 
-Read ROADMAP.md to get the next phase's name and goal.
-
-**If next phase exists:**
-
-<if mode="yolo">
-
-```
-Phase [X] marked complete.
-
-Next: Phase [X+1] — [Name]
-
-⚡ Auto-continuing: Plan Phase [X+1] in detail
-```
-
-Exit skill and invoke SlashCommand("/gsd:plan-phase [X+1]")
-
-</if>
-
-<if mode="interactive" OR="custom with gates.confirm_transition true">
-
-```
-## ✓ Phase [X] Complete
-
----
-
-## ▶ Next Up
-
-**Phase [X+1]: [Name]** — [Goal from ROADMAP.md]
-
-`/gsd:plan-phase [X+1]`
-
-<sub>`/clear` first → fresh context window</sub>
-
----
-
-**Also available:**
-- `/gsd:discuss-phase [X+1]` — gather context first
-- `/gsd:research-phase [X+1]` — investigate unknowns
-- Review roadmap
-
----
-```
-
-</if>
-
----
+- Present next phase name and goal
+- Offer to plan, discuss, or research next phase
 
 **Route B: Milestone complete (all phases done)**
 
-<if mode="yolo">
-
-```
-Phase {X} marked complete.
-
-🎉 Milestone {version} is 100% complete — all {N} phases finished!
-
-⚡ Auto-continuing: Complete milestone and archive
-```
-
-Exit skill and invoke SlashCommand("/gsd:complete-milestone {version}")
-
-</if>
-
-<if mode="interactive" OR="custom with gates.confirm_transition true">
-
-```
-## ✓ Phase {X}: {Phase Name} Complete
-
-🎉 Milestone {version} is 100% complete — all {N} phases finished!
-
----
-
-## ▶ Next Up
-
-**Complete Milestone {version}** — archive and prepare for next
-
-`/gsd:complete-milestone {version}`
-
-<sub>`/clear` first → fresh context window</sub>
-
----
-
-**Also available:**
-- Review accomplishments before archiving
-
----
-```
-
-</if>
+- Announce milestone completion
+- Offer to archive and prepare next milestone
 
 </step>
 
@@ -515,10 +255,10 @@ Exit skill and invoke SlashCommand("/gsd:complete-milestone {version}")
 
 <implicit_tracking>
 
-Progress tracking is IMPLICIT:
+Progress tracking is implicit:
 
-- "Plan phase 2" → Phase 1 must be done (or ask)
-- "Plan phase 3" → Phases 1-2 must be done (or ask)
+- "Plan phase 2" -> Phase 1 must be done (or ask)
+- "Plan phase 3" -> Phases 1-2 must be done (or ask)
 - Transition workflow makes it explicit in ROADMAP.md
 
 No separate "update progress" step. Forward motion IS progress.
@@ -557,7 +297,7 @@ Transition is complete when:
 - [ ] Any stale handoffs deleted
 - [ ] ROADMAP.md updated with completion status and plan count
 - [ ] PROJECT.md evolved (requirements, decisions, description if needed)
-- [ ] STATE.md updated (position, project reference, context, session)
+- [ ] STATE.md updated (position, reference, context, session)
 - [ ] Progress table updated
 - [ ] User knows next steps
 

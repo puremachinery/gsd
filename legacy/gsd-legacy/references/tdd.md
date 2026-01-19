@@ -3,7 +3,7 @@ TDD is about design quality, not coverage metrics. The red-green-refactor cycle 
 
 **Principle:** If you can describe the behavior as `expect(fn(input)).toBe(output)` before writing `fn`, TDD improves the result.
 
-**Key insight:** TDD work is heavier than standard tasks. It requires 2-3 execution cycles (RED -> GREEN -> REFACTOR) with test runs and iteration. TDD features get dedicated plans to ensure full context is available throughout the cycle.
+**Key insight:** TDD work is fundamentally heavier than standard tasks—it requires 2-3 execution cycles (RED → GREEN → REFACTOR), each with file reads, test runs, and potential debugging. TDD features get dedicated plans to ensure full context is available throughout the cycle.
 </overview>
 
 <when_to_use_tdd>
@@ -11,7 +11,7 @@ TDD is about design quality, not coverage metrics. The red-green-refactor cycle 
 
 **TDD candidates (create a TDD plan):**
 - Business logic with defined inputs/outputs
-- Service handlers with request/response contracts
+- service endpoints with request/response contracts
 - Data transformations, parsing, formatting
 - Validation rules and constraints
 - Algorithms with testable behavior
@@ -27,8 +27,8 @@ TDD is about design quality, not coverage metrics. The red-green-refactor cycle 
 - Exploratory prototyping
 
 **Heuristic:** Can you write `expect(fn(input)).toBe(output)` before writing `fn`?
--> Yes: Create a TDD plan
--> No: Use standard plan, add tests after if needed
+→ Yes: Create a TDD plan
+→ No: Use standard plan, add tests after if needed
 </when_to_use_tdd>
 
 <tdd_plan_structure>
@@ -60,7 +60,7 @@ Output: [Working, tested feature]
   <files>[source file, test file]</files>
   <behavior>
     [Expected behavior in testable terms]
-    Cases: input -> expected output
+    Cases: input → expected output
   </behavior>
   <implementation>[How to implement once tests pass]</implementation>
 </feature>
@@ -138,11 +138,49 @@ After completion, create SUMMARY.md with:
 
 When executing a TDD plan but no test framework is configured, set it up as part of the RED phase:
 
-1. Detect project type and existing test conventions
-2. Install minimal test framework for the language
-3. Add test config if required
-4. Verify setup with empty test run
-5. Create first test file using project conventions
+**1. Detect project type:**
+```bash
+# ScriptingLanguage/TypedLanguage
+if [ -f project.manifest ]; then echo "js"; fi
+
+# Python
+if [ -f requirements.txt ] || [ -f pyproject.toml ]; then echo "python"; fi
+
+# Go
+if [ -f go.mod ]; then echo "go"; fi
+
+# Rust
+if [ -f Cargo.toml ]; then echo "rust"; fi
+```
+
+**2. Install minimal framework:**
+| Project | Framework | Install |
+|---------|-----------|---------|
+| ScriptingLanguage/TypedLanguage | TestRunner | `package-manager install --dev test-runner test-types test-adapter` |
+| ScriptingLanguage/TypedLanguage (BuildTool) | TestRunner | `package-manager install --dev test-runner` |
+| Python | pytest | `pip install pytest` |
+| Go | testing | Built-in |
+| Rust | cargo test | Built-in |
+
+**3. Create config if needed:**
+- TestRunner: `test.config.ext` with test-adapter preset
+- TestRunner: `test.config.ext` with test globals
+- pytest: `pytest.ini` or `pyproject.toml` section
+
+**4. Verify setup:**
+```bash
+# Run empty test suite - should pass with 0 tests
+run-tests  # example
+pytest    # Python
+go test ./...  # Go
+cargo test    # Rust
+```
+
+**5. Create first test file:**
+Follow project conventions for test location:
+- `*.test.ext` / `*.spec.ext` next to source
+- `__tests__/` directory
+- `tests/` directory at root
 
 Framework setup is a one-time cost included in the first TDD plan's RED phase.
 </framework_setup>
@@ -185,16 +223,20 @@ test(08-02): add failing test for email validation
 
 feat(08-02): implement email validation
 
-- Regex pattern matches specification
+- Regex pattern matches RFC 5322
 - Returns boolean for validity
 - Handles edge cases (empty, null)
 
-refactor(08-02): extract pattern to constant (optional)
+refactor(08-02): extract regex to constant (optional)
 
 - Moved pattern to EMAIL_REGEX constant
 - No behavior changes
 - Tests still pass
 ```
+
+**Comparison with standard plans:**
+- Standard plans: 1 commit per task, 2-4 commits per plan
+- TDD plans: 2-3 commits for single feature
 
 Both follow same format: `{type}({phase}-{plan}): {description}`
 

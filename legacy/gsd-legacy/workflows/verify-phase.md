@@ -1,13 +1,13 @@
 <purpose>
 Verify phase goal achievement through goal-backward analysis. Check that the codebase actually delivers what the phase promised, not just that tasks were completed.
 
-This workflow is executed by a verification worker spawned from execute-plan.
+This workflow is executed by a verification subagent spawned from execute-phase.md.
 </purpose>
 
 <core_principle>
-**Task completion != Goal achievement**
+**Task completion ≠ Goal achievement**
 
-A task "create module" can be marked complete when the module is a placeholder. The task was done — a file was created — but the goal "working feature" was not achieved.
+A task "create chat module" can be marked complete when the module is a placeholder. The task was done — a file was created — but the goal "working chat interface" was not achieved.
 
 Goal-backward verification starts from the outcome and works backwards:
 1. What must be TRUE for the goal to be achieved?
@@ -19,8 +19,8 @@ Then verify each level against the actual codebase.
 
 <required_reading>
 **Load these references:**
-- references/verification-patterns.md (detection patterns)
-- templates/verification-report.md (output format)
+- ~/.claude/gsd/references/verification-patterns.md (detection patterns)
+- ~/.claude/gsd/templates/verification-report.md (output format)
 </required_reading>
 
 <process>
@@ -37,7 +37,7 @@ PHASE_DIR=$(ls -d .planning/phases/${PADDED_PHASE}-* .planning/phases/${PHASE_AR
 grep -A 5 "Phase ${PHASE_NUM}" .planning/ROADMAP.md
 
 # Requirements mapped to this phase
-grep -E "^\| ${PHASE_NUM}" .planning/REQUIREMENTS.md 2>/dev/null
+grep -E "^| ${PHASE_NUM}" .planning/REQUIREMENTS.md 2>/dev/null
 
 # All SUMMARY files (claims to verify)
 ls "$PHASE_DIR"/*-SUMMARY.md 2>/dev/null
@@ -73,8 +73,8 @@ must_haves:
       provides: "Message list rendering"
   key_links:
     - from: "Chat.ext"
-      to: "service:chat"
-      via: "service call"
+      to: "service/chat"
+      via: "service call in lifecycle hook"
 ```
 
 **Option B: Derive from phase goal**
@@ -82,16 +82,22 @@ must_haves:
 If no must_haves in frontmatter, derive using goal-backward process:
 
 1. **State the goal:** Take phase goal from ROADMAP.md
+
 2. **Derive truths:** Ask "What must be TRUE for this goal to be achieved?"
    - List 3-7 observable behaviors from user perspective
    - Each truth should be testable by a human using the app
+
 3. **Derive artifacts:** For each truth, ask "What must EXIST?"
-   - Map truths to concrete files (modules, handlers, schemas)
+   - Map truths to concrete files (modules, routes, schemas)
    - Be specific: `src/modules/Chat.ext`, not "chat module"
+
 4. **Derive key links:** For each artifact, ask "What must be CONNECTED?"
-   - Identify critical wiring (module calls service, handler queries data store)
+   - Identify critical wiring (module calls service, service queries DB)
    - These are where stubs hide
+
 5. **Document derived must-haves** before proceeding to verification.
+
+<!-- Goal-backward derivation expertise is baked into the gsd-verifier agent -->
 </step>
 
 <step name="verify_truths">
@@ -110,6 +116,19 @@ A truth is achievable if the supporting artifacts exist, are substantive, and ar
 2. Check artifact status (see verify_artifacts step)
 3. Check wiring status (see verify_wiring step)
 4. Determine truth status based on supporting infrastructure
+
+**Example:**
+
+Truth: "User can see existing messages"
+
+Supporting artifacts:
+- Chat.ext (renders messages)
+- /service/chat GET (provides messages)
+- Message model (defines schema)
+
+If Chat.ext is a stub → Truth FAILED
+If /service/chat GET returns hardcoded [] → Truth FAILED
+If Chat.ext exists, is substantive, calls service, renders response → Truth VERIFIED
 </step>
 
 <step name="verify_artifacts">
@@ -130,7 +149,7 @@ check_exists() {
 }
 ```
 
-If MISSING -> artifact fails, record and continue to next artifact.
+If MISSING → artifact fails, record and continue to next artifact.
 
 ### Level 2: Substantive
 
@@ -147,8 +166,8 @@ check_length() {
 ```
 
 Minimum lines by type:
-- Module: 15+ lines
-- Handler: 10+ lines
+- Component: 15+ lines
+- service handler: 10+ lines
 - Hook/util: 10+ lines
 - Schema model: 5+ lines
 
@@ -161,7 +180,7 @@ check_stubs() {
   local stubs=$(grep -c -E "TODO|FIXME|placeholder|not implemented|coming soon" "$path" 2>/dev/null || echo 0)
 
   # Empty returns
-  local empty=$(grep -c -E "return null|return undefined|return \{\}|return \[]" "$path" 2>/dev/null || echo 0)
+  local empty=$(grep -c -E "return null|return undefined|return \{\}|return \[\]" "$path" 2>/dev/null || echo 0)
 
   # Placeholder content
   local placeholder=$(grep -c -E "will be here|placeholder|lorem ipsum" "$path" 2>/dev/null || echo 0)
@@ -175,7 +194,7 @@ check_stubs() {
 ```bash
 check_exports() {
   local path="$1"
-  grep -E "export|def|function|class" "$path" && echo "HAS_EXPORTS" || echo "NO_EXPORTS"
+  grep -E "^export (default )?(function|const|class)" "$path" && echo "HAS_EXPORTS" || echo "NO_EXPORTS"
 }
 ```
 
@@ -195,7 +214,7 @@ check_imported() {
   local search_path="${2:-src/}"
 
   # Find imports of this artifact
-  local imports=$(grep -r "import.*$artifact_name" "$search_path" --include="*.ext" 2>/dev/null | wc -l)
+  local imports=$(grep -r "import.*$artifact_name" "$search_path" --include="*.ext" --include="*.ext" 2>/dev/null | wc -l)
 
   [ "$imports" -gt 0 ] && echo "IMPORTED ($imports times)" || echo "NOT_IMPORTED"
 }
@@ -208,7 +227,7 @@ check_used() {
   local search_path="${2:-src/}"
 
   # Find usages (function calls, module renders, etc.)
-  local uses=$(grep -r "$artifact_name" "$search_path" --include="*.ext" 2>/dev/null | grep -v "import" | wc -l)
+  local uses=$(grep -r "$artifact_name" "$search_path" --include="*.ext" --include="*.ext" 2>/dev/null | grep -v "import" | wc -l)
 
   [ "$uses" -gt 0 ] && echo "USED ($uses times)" || echo "NOT_USED"
 }
@@ -236,61 +255,61 @@ Record status and evidence for each artifact.
 
 Key links are critical connections. If broken, the goal fails even with all artifacts present.
 
-### Pattern: Module -> Service
+### Pattern: Module → Service
 
 Check if module actually calls the service:
 
 ```bash
-verify_component_service_link() {
+verify_component_api_link() {
   local module="$1"
-  local service_id="$2"
+  local api_path="$2"
 
   # Check for callService/clientCall call to the service
-  local has_call=$(grep -E "callService\(['"].*$service_id|clientCall\.(get|post).*$service_id" "$module" 2>/dev/null)
+  local has_call=$(grep -E "callService\(['\"].*$api_path|clientCall\.(get|post).*$api_path" "$module" 2>/dev/null)
 
   if [ -n "$has_call" ]; then
     # Check if response is used
     local uses_response=$(grep -A 5 "callService\|clientCall" "$module" | grep -E "await|\.then|setData|setState" 2>/dev/null)
 
     if [ -n "$uses_response" ]; then
-      echo "WIRED: $module -> $service_id (call + response handling)"
+      echo "WIRED: $module → $api_path (call + response handling)"
     else
-      echo "PARTIAL: $module -> $service_id (call exists but response not used)"
+      echo "PARTIAL: $module → $api_path (call exists but response not used)"
     fi
   else
-    echo "NOT_WIRED: $module -> $service_id (no call found)"
+    echo "NOT_WIRED: $module → $api_path (no call found)"
   fi
 }
 ```
 
-### Pattern: Service -> Data Store
+### Pattern: Service → Database
 
-Check if handler queries data store:
+Check if service handler queries database:
 
 ```bash
-verify_service_data_link() {
-  local handler="$1"
+verify_api_db_link() {
+  local route="$1"
   local model="$2"
 
-  # Check for data call
-  local has_query=$(grep -E "data\.$model|db\.$model|$model\.(find|create|update|delete)" "$handler" 2>/dev/null)
+  # Check for ORMTool/DB call
+  local has_query=$(grep -E "orm-tool\.$model|db\.$model|$model\.(find|create|update|delete)" "$route" 2>/dev/null)
 
   if [ -n "$has_query" ]; then
     # Check if result is returned
-    local returns_result=$(grep -E "return.*data|return.*result|send\(" "$handler" 2>/dev/null)
+    local returns_result=$(grep -E "return.*json.*\w+|res\.json\(\w+" "$route" 2>/dev/null)
 
     if [ -n "$returns_result" ]; then
-      echo "WIRED: $handler -> data store ($model)"
+      echo "WIRED: $route → database ($model)"
     else
-      echo "PARTIAL: $handler -> data store (query exists but result not returned)"
+      echo "PARTIAL: $route → database (query exists but result not returned)"
     fi
   else
-    echo "NOT_WIRED: $handler -> data store (no query for $model)"
+    echo "NOT_WIRED: $route → database (no query for $model)"
   fi
 }
 ```
 
-### Pattern: Form -> Handler
+### Pattern: Form → Handler
 
 Check if form submission does something:
 
@@ -306,23 +325,23 @@ verify_form_handler_link() {
     local handler_content=$(grep -A 10 "onSubmit.*=" "$module" | grep -E "callService|clientCall|mutate|dispatch" 2>/dev/null)
 
     if [ -n "$handler_content" ]; then
-      echo "WIRED: form -> handler (has service call)"
+      echo "WIRED: form → handler (has service call)"
     else
       # Check for stub patterns
-      local is_stub=$(grep -A 5 "onSubmit" "$module" | grep -E "logger\.info|preventDefault\(\)$|\{\}" 2>/dev/null)
+      local is_stub=$(grep -A 5 "onSubmit" "$module" | grep -E "console\.log|preventDefault\(\)$|\{\}" 2>/dev/null)
       if [ -n "$is_stub" ]; then
-        echo "STUB: form -> handler (only logs or empty)"
+        echo "STUB: form → handler (only logs or empty)"
       else
-        echo "PARTIAL: form -> handler (exists but unclear implementation)"
+        echo "PARTIAL: form → handler (exists but unclear implementation)"
       fi
     fi
   else
-    echo "NOT_WIRED: form -> handler (no onSubmit found)"
+    echo "NOT_WIRED: form → handler (no onSubmit found)"
   fi
 }
 ```
 
-### Pattern: State -> Render
+### Pattern: State → Render
 
 Check if state is actually rendered:
 
@@ -335,16 +354,16 @@ verify_state_render_link() {
   local has_state=$(grep -E "stateHook.*$state_var|\[$state_var," "$module" 2>/dev/null)
 
   if [ -n "$has_state" ]; then
-    # Check if state is used in output
+    # Check if state is used in JSX
     local renders_state=$(grep -E "\{.*$state_var.*\}|\{$state_var\." "$module" 2>/dev/null)
 
     if [ -n "$renders_state" ]; then
-      echo "WIRED: state -> render ($state_var displayed)"
+      echo "WIRED: state → render ($state_var displayed)"
     else
-      echo "NOT_WIRED: state -> render ($state_var exists but not displayed)"
+      echo "NOT_WIRED: state → render ($state_var exists but not displayed)"
     fi
   else
-    echo "N/A: state -> render (no state var $state_var)"
+    echo "N/A: state → render (no state var $state_var)"
   fi
 }
 ```
@@ -407,12 +426,12 @@ scan_antipatterns() {
     done
 
     # Empty implementations
-    grep -n -E "return null|return \{\}|return \[]|=> \{\}" "$file" 2>/dev/null | while read line; do
+    grep -n -E "return null|return \{\}|return \[\]|=> \{\}" "$file" 2>/dev/null | while read line; do
       echo "| $file | $(echo $line | cut -d: -f1) | Empty return | ⚠️ Warning |"
     done
 
-    # Log-only implementations
-    grep -n -B 2 -A 2 "logger\.info" "$file" 2>/dev/null | grep -E "^\s*(const|function|=>)" | while read line; do
+    # Console.log only implementations
+    grep -n -B 2 -A 2 "console\.log" "$file" 2>/dev/null | grep -E "^\s*(const|function|=>)" | while read line; do
       echo "| $file | - | Log-only function | ⚠️ Warning |"
     done
   done
@@ -421,7 +440,7 @@ scan_antipatterns() {
 
 Categorize findings:
 - 🛑 Blocker: Prevents goal achievement (placeholder renders, empty handlers)
-- ⚠️ Warning: Indicates incomplete (TODO comments, log-only)
+- ⚠️ Warning: Indicates incomplete (TODO comments, logger.info)
 - ℹ️ Info: Notable but not problematic
 </step>
 
@@ -433,8 +452,8 @@ Some things can't be verified programmatically:
 **Always needs human:**
 - Visual appearance (does it look right?)
 - User flow completion (can you do the full task?)
-- Real-time behavior (live updates, streaming, sync)
-- External service integration (payments, email, third-party APIs)
+- Real-time behavior (WebSocket, SSE updates)
+- External service integration (payments, email)
 - Performance feel (does it feel fast?)
 - Error message clarity
 
@@ -462,7 +481,7 @@ Some things can't be verified programmatically:
 - All artifacts pass level 1-3
 - All key links WIRED
 - No blocker anti-patterns
-- (Human verification items are OK -- will be prompted)
+- (Human verification items are OK — will be prompted)
 
 **Status: gaps_found**
 - One or more truths FAILED
@@ -487,9 +506,9 @@ score = (verified_truths / total_truths)
 Group related gaps into fix plans:
 
 1. **Identify gap clusters:**
-   - service stub + module not wired -> "Wire module to service"
-   - Multiple artifacts missing -> "Complete core implementation"
-   - Wiring issues only -> "Connect existing modules"
+   - service stub + module not wired → "Wire frontend to backend"
+   - Multiple artifacts missing → "Complete core implementation"
+   - Wiring issues only → "Connect existing modules"
 
 2. **Generate plan recommendations:**
 
@@ -546,11 +565,11 @@ Fill template sections:
 9. **Recommended Fix Plans:** If gaps_found
 10. **Verification Metadata:** Approach, timing, counts
 
-See templates/verification-report.md for complete template.
+See ~/.claude/gsd/templates/verification-report.md for complete template.
 </step>
 
 <step name="return_to_orchestrator">
-**Return results to execute-plan orchestrator.**
+**Return results to execute-phase orchestrator.**
 
 **Return format:**
 

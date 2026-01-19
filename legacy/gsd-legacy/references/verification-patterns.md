@@ -1,9 +1,9 @@
-# Verification Patterns (Neutral)
+# Verification Patterns
 
 How to verify different types of artifacts are real implementations, not stubs or placeholders.
 
 <core_principle>
-**Existence != Implementation**
+**Existence ≠ Implementation**
 
 A file existing does not mean the feature works. Verification must check:
 1. **Exists** - File is present at expected path
@@ -25,7 +25,7 @@ These patterns indicate placeholder code regardless of file type:
 # Grep patterns for stub comments
 grep -E "(TODO|FIXME|XXX|HACK|PLACEHOLDER)" "$file"
 grep -E "implement|add later|coming soon|will be" "$file" -i
-grep -E "// \\.\\.\.|/\* \\.\\.\. \*/|# \\.\\.\." "$file"
+grep -E "// \.\.\.|/\* \.\.\. \*/|# \.\.\." "$file"
 ```
 
 **Placeholder text in output:**
@@ -39,24 +39,24 @@ grep -E "\[.*\]|<.*>|\{.*\}" "$file"  # Template brackets left in
 **Empty or trivial implementations:**
 ```bash
 # Functions that do nothing
-grep -E "return null|return undefined|return \{\}|return \[]" "$file"
+grep -E "return null|return undefined|return \{\}|return \[\]" "$file"
 grep -E "pass$|\.\.\.|\bnothing\b" "$file"
-grep -E "logger\.(info|warn|error).*only" "$file"  # Log-only functions
+grep -E "console\.(log|warn|error).*only" "$file"  # Log-only functions
 ```
 
 **Hardcoded values where dynamic expected:**
 ```bash
 # Hardcoded IDs, counts, or content
-grep -E "id.*=.*['"].*['"]" "$file"  # Hardcoded string IDs
+grep -E "id.*=.*['\"].*['\"]" "$file"  # Hardcoded string IDs
 grep -E "count.*=.*\d+|length.*=.*\d+" "$file"  # Hardcoded counts
-grep -E "\\$\d+\.\d{2}|\d+ items" "$file"  # Hardcoded display values
+grep -E "\\\$\d+\.\d{2}|\d+ items" "$file"  # Hardcoded display values
 ```
 
 </stub_detection>
 
 <ui_components>
 
-## UI Modules / Views
+## UIFramework/WebFramework Components
 
 **Existence check:**
 ```bash
@@ -76,7 +76,7 @@ grep -E "event|handler|bind|class=|style=|text=|title=" "$component_path"
 grep -E "inputs?\.|params\.|args\.|stateHook|lifecycle hook|contextHook" "$component_path"
 ```
 
-**Stub patterns specific to UI modules:**
+**Stub patterns specific to UIFramework:**
 ```text
 // RED FLAGS - These are stubs:
 return "<Component>"
@@ -93,19 +93,19 @@ onSubmit=(event) => preventDefault  // Only prevents default, does nothing
 
 **Wiring check:**
 ```bash
-# Module imports what it needs
+# Component imports what it needs
 grep -E "import|require|include" "$component_path"
 
 # Inputs are actually used (not just received)
 grep -E "inputs?\.|params\.|args\." "$component_path"
 
-# Service calls exist (for data-calling modules)
+# service calls exist (for data-calling service modules)
 grep -E "callService\(|clientCall\.|dataFetch|queryHelper" "$component_path"
 ```
 
 **Functional verification (human required):**
 - Does the module render visible content?
-- Do interactive elements respond to actions?
+- Do interactive elements respond to clicks?
 - Does data load and display?
 - Do error states show appropriately?
 
@@ -113,7 +113,7 @@ grep -E "callService\(|clientCall\.|dataFetch|queryHelper" "$component_path"
 
 <service_handlers>
 
-## Service Handlers (Generic)
+## Service Handlers (generic)
 
 **Existence check:**
 ```bash
@@ -157,7 +157,7 @@ export async function handleWrite(input) {
   return {}  // Empty result with no side effects
 }
 
-// Log-only:
+// Console log only:
 export async function handleUpdate(input) {
   logger.info(input)
   return { ok: true }
@@ -166,14 +166,14 @@ export async function handleUpdate(input) {
 
 **Wiring check:**
 ```bash
-# Imports data/service clients
-grep -E "^import.*data|^import.*client" "$handler_path"
+# Imports database/service clients
+grep -E "^import.*orm-tool|^import.*db|^import.*client" "$handler_path"
 
 # Actually uses input payload (for write/update)
 grep -E "input|payload|body" "$handler_path"
 
 # Validates input (not just trusting request)
-grep -E "schema\.parse|validate|check|assert" "$handler_path"
+grep -E "schema\.parse|validate|zod|yup|joi" "$handler_path"
 ```
 
 **Functional verification (human or automated):**
@@ -186,31 +186,31 @@ grep -E "schema\.parse|validate|check|assert" "$handler_path"
 
 <database_schema>
 
-## Data Schema (Generic)
+## Database Schema (ORMTool / SQL)
 
 **Existence check:**
 ```bash
 # Schema file exists
-[ -f "data/schema.ext" ] || [ -f "db/schema.ext" ] || [ -f "schema.sql" ]
+[ -f "orm/schema.orm" ] || [ -f "drizzle/schema.ext" ] || [ -f "src/db/schema.sql" ]
 
 # Model/table is defined
-grep -E "model $model_name|CREATE TABLE $table_name|define $table_name" "$schema_path"
+grep -E "^model $model_name|CREATE TABLE $table_name|export const $table_name" "$schema_path"
 ```
 
 **Substantive check:**
 ```bash
 # Has expected fields (not just id)
-grep -A 20 "$model_name" "$schema_path" | grep -E "\w+\s+\w+"
+grep -A 20 "model $model_name" "$schema_path" | grep -E "^\s+\w+\s+\w+"
 
 # Has relationships if expected
-grep -E "relation|REFERENCES|FOREIGN KEY" "$schema_path"
+grep -E "@relation|REFERENCES|FOREIGN KEY" "$schema_path"
 
-# Has appropriate field types (not all string)
-grep -A 20 "$model_name" "$schema_path" | grep -E "Int|DateTime|Boolean|Float|Decimal|Json" -i
+# Has appropriate field types (not all String)
+grep -A 20 "model $model_name" "$schema_path" | grep -E "Int|DateTime|Boolean|Float|Decimal|Json"
 ```
 
 **Stub patterns specific to schemas:**
-```text
+```orm-tool
 // RED FLAGS - These are stubs:
 model User {
   id String @id
@@ -232,37 +232,38 @@ model Order {
 **Wiring check:**
 ```bash
 # Migrations exist and are applied
-ls db/migrations/ 2>/dev/null | wc -l  # Should be > 0
+ls orm/migrations/ 2>/dev/null | wc -l  # Should be > 0
+orm-tool migrate status 2>/dev/null | grep -v "pending"
 
-# Client or schema artifacts generated (if applicable)
-[ -d "deps/.data/client" ]
+# Client is generated
+[ -d "deps/.orm/client" ]
 ```
 
 **Functional verification:**
 ```bash
 # Can query the table (automated)
-query-cli --execute "SELECT COUNT(*) FROM $table_name"
+orm-tool db execute --stdin <<< "SELECT COUNT(*) FROM $table_name"
 ```
 
 </database_schema>
 
 <hooks_utilities>
 
-## Hooks and Utilities
+## Custom Hooks and Utilities
 
 **Existence check:**
 ```bash
 # File exists and exports function
-[ -f "$hook_path" ] && grep -E "(function|const|def)" "$hook_path"
+[ -f "$hook_path" ] && grep -E "export (default )?(function|const)" "$hook_path"
 ```
 
 **Substantive check:**
 ```bash
-# Uses lifecycle/state helpers (if applicable)
+# Hook uses UIFramework hooks (for custom hooks)
 grep -E "stateHook|lifecycle hook|callbackHook|memoHook|refHook|contextHook" "$hook_path"
 
 # Has meaningful return value
-grep -E "return \{|return \[]" "$hook_path"
+grep -E "return \{|return \[" "$hook_path"
 
 # More than trivial length
 [ $(wc -l < "$hook_path") -gt 10 ]
@@ -289,10 +290,10 @@ export function useUser() {
 **Wiring check:**
 ```bash
 # Hook is actually imported somewhere
-grep -r "import.*$hook_name" src/ --include="*.ext" | grep -v "$hook_path"
+grep -r "import.*$hook_name" src/ --include="*.ext" --include="*.ext" | grep -v "$hook_path"
 
 # Hook is actually called
-grep -r "$hook_name()" src/ --include="*.ext" | grep -v "$hook_path"
+grep -r "$hook_name()" src/ --include="*.ext" --include="*.ext" | grep -v "$hook_path"
 ```
 
 </hooks_utilities>
@@ -314,24 +315,29 @@ grep -E "^$VAR_NAME=" .env .env.local 2>/dev/null
 ```bash
 # Variable has actual value (not placeholder)
 grep -E "^$VAR_NAME=.+" .env .env.local 2>/dev/null | grep -v "your-.*-here|xxx|placeholder|TODO" -i
+
+# Value looks valid for type:
+# - URLs should start with http
+# - Keys should be long enough
+# - Booleans should be true/false
 ```
 
 **Stub patterns specific to env:**
 ```bash
 # RED FLAGS - These are stubs:
 DATABASE_URL=your-database-url-here
-SERVICE_KEY=key_test_xxx
-SERVICE_KEY=placeholder
-PUBLIC_SERVICE_URL=http://localhost:3000  # Still pointing to localhost in prod
+PAYMENTS_service_KEY=key_test_xxx
+service_KEY=placeholder
+PUBLIC_service_URL=http://localhost:3000  # Still pointing to localhost in prod
 ```
 
 **Wiring check:**
 ```bash
 # Variable is actually used in code
-grep -r "env\.$VAR_NAME|ENV\[$VAR_NAME\]" src/ --include="*.ext"
+grep -r "process\.env\.$VAR_NAME|env\.$VAR_NAME" src/ --include="*.ext" --include="*.ext"
 
-# Variable is in validation schema (if using a config schema)
-grep -E "$VAR_NAME" src/env.ext config/env.ext 2>/dev/null
+# Variable is in validation schema (if using zod/etc for env)
+grep -E "$VAR_NAME" src/env.ext src/env.ext 2>/dev/null
 ```
 
 </environment_config>
@@ -342,13 +348,13 @@ grep -E "$VAR_NAME" src/env.ext config/env.ext 2>/dev/null
 
 Wiring verification checks that modules actually communicate. This is where most stubs hide.
 
-### Pattern: Module -> Service
+### Pattern: Module → Service
 
 **Check:** Does the module actually call the service?
 
 ```bash
 # Find the callService/clientCall call
-grep -E "callService\(['"].*$api_path|clientCall\.(get|post).*$api_path" "$component_path"
+grep -E "callService\(['\"].*$api_path|clientCall\.(get|post).*$api_path" "$component_path"
 
 # Verify it's not commented out
 grep -E "callService\(|clientCall\." "$component_path" | grep -v "^.*//.*service call"
@@ -359,43 +365,43 @@ grep -E "await.*callService|\.then\(|setData|setState" "$component_path"
 
 **Red flags:**
 ```text
-// Call exists but response ignored:
-callService('messages')  // No await, no then, no assignment
+// Fetch exists but response ignored:
+callService('/service/messages')  // No await, no .then, no assignment
 
-// Call in comment:
-// callService('messages').then(r => r.json()).then(setMessages)
+// Fetch in comment:
+// callService('/service/messages').then(r => r.json()).then(setMessages)
 
-// Call to wrong target:
-callService('message')  // Typo - should be 'messages'
+// Fetch to wrong endpoint:
+callService('/service/message')  // Typo - should be /service/messages
 ```
 
-### Pattern: Service -> Data Store
+### Pattern: Service → Database
 
-**Check:** Does the service handler actually query the data store?
+**Check:** Does the service handler actually query the database?
 
 ```bash
-# Find the data call
-grep -E "data\.$model|db\.query|Model\.find" "$handler_path"
+# Find the database call
+grep -E "orm-tool\.$model|db\.query|Model\.find" "$handler_path"
 
 # Verify it's awaited
-grep -E "await.*data|await.*db\." "$handler_path"
+grep -E "await.*orm-tool|await.*db\." "$handler_path"
 
 # Check result is returned
-grep -E "return.*data|return.*result|send\(" "$handler_path"
+grep -E "return.*json.*data|res\.json.*result" "$handler_path"
 ```
 
 **Red flags:**
 ```text
 // Query exists but result not returned:
-await data.message.findMany()
-return { ok: true }  // Returns static, not query result
+await orm-tool.message.findMany()
+return Response.json({ ok: true })  // Returns static, not query result
 
 // Query not awaited:
-const messages = data.message.findMany()  // Missing await
-return messages  // Returns Promise, not data
+const messages = orm-tool.message.findMany()  // Missing await
+return Response.json(messages)  // Returns Promise, not data
 ```
 
-### Pattern: Form -> Handler
+### Pattern: Form → Handler
 
 **Check:** Does the form submission actually do something?
 
@@ -413,7 +419,7 @@ grep -A 5 "onSubmit" "$component_path" | grep -v "only.*preventDefault" -i
 **Red flags:**
 ```text
 // Handler only prevents default:
-onSubmit=(event) => preventDefault
+onSubmit={(e) => e.preventDefault()}
 
 // Handler only logs:
 const handleSubmit = (data) => {
@@ -421,15 +427,15 @@ const handleSubmit = (data) => {
 }
 
 // Handler is empty:
-onSubmit=() => {}
+onSubmit={() => {}}
 ```
 
-### Pattern: State -> Render
+### Pattern: State → Render
 
 **Check:** Does the module render state, not hardcoded content?
 
 ```bash
-# Find state usage in output
+# Find state usage in template/output
 grep -E "\{.*messages.*\}|\{.*data.*\}|\{.*items.*\}" "$component_path"
 
 # Check map/render of state
@@ -442,16 +448,18 @@ grep -E "\{[a-zA-Z_]+\." "$component_path"  # Variable interpolation
 **Red flags:**
 ```text
 // Hardcoded instead of state:
-return "Message 1"
-return "Message 2"
+return <div>
+  <p>Message 1</p>
+  <p>Message 2</p>
+</div>
 
 // State exists but not rendered:
 const [messages, setMessages] = stateHook([])
-return "No messages"  // Always shows placeholder
+return <div>No messages</div>  // Always shows "no messages"
 
 // Wrong state rendered:
 const [messages, setMessages] = stateHook([])
-return renderList(otherData)  // Uses different data
+return <div>{otherData.map(...)}</div>  // Uses different data
 ```
 
 </wiring_verification>
@@ -476,7 +484,7 @@ For each artifact type, run through this checklist:
 - [ ] File exists at expected path
 - [ ] Exports handler entry points
 - [ ] Handlers have more than 5 lines
-- [ ] Queries data store or service
+- [ ] Queries database or service
 - [ ] Returns meaningful response (not empty/placeholder)
 - [ ] Has error handling
 - [ ] Validates input
@@ -498,10 +506,10 @@ For each artifact type, run through this checklist:
 - [ ] Return values consumed
 
 ### Wiring Checklist
-- [ ] Module -> Service: callService/clientCall call exists and uses response
-- [ ] Service -> Data Store: query exists and result returned
-- [ ] Form -> Handler: onSubmit calls service/mutation
-- [ ] State -> Render: state variables appear in output
+- [ ] Module → Service: callService/clientCall call exists and uses response
+- [ ] Service → Database: query exists and result returned
+- [ ] Form → Handler: onSubmit calls service/mutation
+- [ ] State → Render: state variables appear in output
 
 </verification_checklist>
 
@@ -527,8 +535,8 @@ check_stubs() {
 # 3. Check wiring (module calls service)
 check_wiring() {
   local module="$1"
-  local service_id="$2"
-  grep -q "$service_id" "$module" && echo "WIRED: $module -> $service_id" || echo "NOT_WIRED: $module -> $service_id"
+  local api_path="$2"
+  grep -q "$api_path" "$module" && echo "WIRED: $module → $api_path" || echo "NOT_WIRED: $module → $api_path"
 }
 
 # 4. Check substantive (more than N lines, has expected patterns)
@@ -555,8 +563,8 @@ Some things can't be verified programmatically. Flag these for human testing:
 **Always human:**
 - Visual appearance (does it look right?)
 - User flow completion (can you actually do the thing?)
-- Real-time behavior (live updates, streaming, sync)
-- External service integration (payments, email, third-party APIs)
+- Real-time behavior (WebSocket, SSE)
+- External service integration (PaymentsProvider, email sending)
 - Error message clarity (is the message helpful?)
 - Performance feel (does it feel fast?)
 
@@ -571,7 +579,7 @@ Some things can't be verified programmatically. Flag these for human testing:
 ```markdown
 ## Human Verification Required
 
-### 1. Message sending
+### 1. Chat message sending
 **Test:** Type a message and click Send
 **Expected:** Message appears in list, input clears
 **Check:** Does message persist after refresh?

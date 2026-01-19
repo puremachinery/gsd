@@ -1,11 +1,11 @@
-# Phase Prompt Template (Neutral)
+# Phase Prompt Template
 
-> **Note:** Planning methodology lives in `agents/planner.md`.
-> This template defines the PLAN.md output format.
+> **Note:** Planning methodology is in `agents/gsd-planner.md`.
+> This template defines the PLAN.md output format that the agent produces.
 
-Template for `.planning/phases/XX-name/{phase}-{plan}-PLAN.md` — executable phase plans optimized for parallel execution.
+Template for `.planning/phases/XX-name/{phase}-{plan}-PLAN.md` - executable phase plans optimized for parallel execution.
 
-**Naming:** Use `{phase}-{plan}-PLAN.md` (e.g., `01-02-PLAN.md` for Phase 1, Plan 2)
+**Naming:** Use `{phase}-{plan}-PLAN.md` format (e.g., `01-02-PLAN.md` for Phase 1, Plan 2)
 
 ---
 
@@ -37,10 +37,10 @@ Output: [What artifacts will be created]
 </objective>
 
 <execution_context>
-@workflows/execute-plan.md
-@templates/SUMMARY.md
+@~/.claude/gsd/workflows/execute-plan.md
+@~/.claude/gsd/templates/summary.md
 [If plan contains checkpoint tasks (type="checkpoint:*"), add:]
-@references/checkpoints.md
+@~/.claude/gsd/references/checkpoints.md
 </execution_context>
 
 <context>
@@ -51,7 +51,6 @@ Output: [What artifacts will be created]
 # Only reference prior plan SUMMARYs if genuinely needed:
 # - This plan uses types/exports from prior plan
 # - Prior plan made decision that affects this plan
-# - Prior plan output is direct input to this plan
 # Do NOT reflexively chain: Plan 02 refs 01, Plan 03 refs 02...
 
 [Relevant source files:]
@@ -97,8 +96,8 @@ Output: [What artifacts will be created]
 <task type="checkpoint:human-verify" gate="blocking">
   <what-built>[What assistant just built that needs verification]</what-built>
   <how-to-verify>
-    1. Run: [command to start app/service]
-    2. Open: [location to check]
+    1. Run: [command to start dev server/app]
+    2. Visit: [URL to check]
     3. Test: [Specific interactions]
     4. Confirm: [Expected behaviors]
   </how-to-verify>
@@ -120,7 +119,7 @@ Before declaring plan complete:
 - All verification checks pass
 - No errors or warnings introduced
 - [Plan-specific criteria]
-</success_criteria>
+  </success_criteria>
 
 <output>
 After completion, create `.planning/phases/XX-name/{phase}-{plan}-SUMMARY.md`
@@ -135,7 +134,7 @@ After completion, create `.planning/phases/XX-name/{phase}-{plan}-SUMMARY.md`
 |-------|----------|---------|
 | `phase` | Yes | Phase identifier (e.g., `01-foundation`) |
 | `plan` | Yes | Plan number within phase (e.g., `01`, `02`) |
-| `type` | Yes | `execute` for standard plans, `tdd` for TDD plans |
+| `type` | Yes | Always `execute` for standard plans, `tdd` for TDD plans |
 | `wave` | Yes | Execution wave number (1, 2, 3...). Pre-computed at plan time. |
 | `depends_on` | Yes | Array of plan IDs this plan requires. |
 | `files_modified` | Yes | Files this plan touches. |
@@ -143,31 +142,39 @@ After completion, create `.planning/phases/XX-name/{phase}-{plan}-SUMMARY.md`
 | `user_setup` | No | Array of human-required setup items (external services) |
 | `must_haves` | Yes | Goal-backward verification criteria (see below) |
 
-**Wave is pre-computed:** Wave numbers are assigned during plan-phase. Execute-phase reads `wave` directly from frontmatter and groups plans by wave number. No runtime dependency analysis needed.
+**Wave is pre-computed:** Wave numbers are assigned during `/gsd:plan-phase`. Execute-phase reads `wave` directly from frontmatter and groups plans by wave number. No runtime dependency analysis needed.
 
-**Must-haves enable verification:** The `must_haves` field carries goal-backward requirements from planning to execution. After all plans complete, a verification pass checks these criteria against the codebase.
+**Must-haves enable verification:** The `must_haves` field carries goal-backward requirements from planning to execution. After all plans complete, execute-phase spawns a verification subagent that checks these criteria against the actual codebase.
 
 ---
 
 ## Parallel vs Sequential
 
+<parallel_examples>
+
 **Wave 1 candidates (parallel):**
 
 ```yaml
-# Plan 01 - Feature A
+# Plan 01 - User feature
 wave: 1
 depends_on: []
-files_modified: [src/features/a/model.ext, src/features/a/handler.ext]
+files_modified: [src/models/user.ext, src/services/users.ext]
 autonomous: true
 
-# Plan 02 - Feature B (no overlap with Plan 01)
+# Plan 02 - Product feature (no overlap with Plan 01)
 wave: 1
 depends_on: []
-files_modified: [src/features/b/model.ext, src/features/b/handler.ext]
+files_modified: [src/models/product.ext, src/services/products.ext]
+autonomous: true
+
+# Plan 03 - Order feature (no overlap)
+wave: 1
+depends_on: []
+files_modified: [src/models/order.ext, src/services/orders.ext]
 autonomous: true
 ```
 
-All run in parallel (Wave 1) - no dependencies, no file conflicts.
+All three run in parallel (Wave 1) - no dependencies, no file conflicts.
 
 **Sequential (genuine dependency):**
 
@@ -193,11 +200,13 @@ Plan 02 in Wave 2 waits for Plan 01 in Wave 1 - genuine dependency on auth types
 # Plan 03 - UI with verification
 wave: 3
 depends_on: ["01", "02"]
-files_modified: [src/modules/control-panel/entry.ext]
+files_modified: [src/modules/ControlPanel.ext]
 autonomous: false  # Has checkpoint:human-verify
 ```
 
-Wave 3 runs after Waves 1 and 2. Pauses at checkpoint, resumes on approval.
+Wave 3 runs after Waves 1 and 2. Pauses at checkpoint, orchestrator presents to user, resumes on approval.
+
+</parallel_examples>
 
 ---
 
@@ -239,7 +248,7 @@ Wave 3 runs after Waves 1 and 2. Pauses at checkpoint, resumes on approval.
 
 - 2-3 tasks per plan
 - ~50% context usage maximum
-- Complex phases: multiple focused plans, not one large plan
+- Complex phases: Multiple focused plans, not one large plan
 
 **When to split:**
 
@@ -251,12 +260,12 @@ Wave 3 runs after Waves 1 and 2. Pauses at checkpoint, resumes on approval.
 **Vertical slices preferred:**
 
 ```
-PREFER: Plan 01 = Feature A (model + handler + module)
-        Plan 02 = Feature B (model + handler + module)
+PREFER: Plan 01 = User (model + service + module)
+        Plan 02 = Product (model + service + module)
 
 AVOID:  Plan 01 = All models
-        Plan 02 = All handlers
-        Plan 03 = All modules
+        Plan 02 = All APIs
+        Plan 03 = All UIs
 ```
 
 ---
@@ -269,7 +278,7 @@ TDD features get dedicated plans with `type: tdd`.
 → Yes: Create a TDD plan
 → No: Standard task in standard plan
 
-See `references/tdd.md` for TDD plan structure.
+See `~/.claude/gsd/references/tdd.md` for TDD plan structure.
 
 ---
 
@@ -302,7 +311,7 @@ plan: 01
 type: execute
 wave: 1
 depends_on: []
-files_modified: [src/features/user/model.ext, src/features/user/handler.ext, src/features/user/module.ext]
+files_modified: [src/features/user/model.ext, src/features/user/api.ext, src/features/user/UserList.ext]
 autonomous: true
 ---
 
@@ -310,7 +319,7 @@ autonomous: true
 Implement complete User feature as vertical slice.
 
 Purpose: Self-contained user management that can run parallel to other features.
-Output: User model, service handlers, and a module entry point.
+Output: User model, service endpoints, and UI modules.
 </objective>
 
 <context>
@@ -323,23 +332,23 @@ Output: User model, service handlers, and a module entry point.
 <task type="auto">
   <name>Task 1: Create User model</name>
   <files>src/features/user/model.ext</files>
-  <action>Define User type with id, email, name, createdAt. Export typed interface.</action>
+  <action>Define User type with id, email, name, createdAt. Export TypedLanguage interface.</action>
   <verify>run-typecheck passes</verify>
   <done>User type exported and usable</done>
 </task>
 
 <task type="auto">
-  <name>Task 2: Create User service handlers</name>
-  <files>src/features/user/handler.ext</files>
-  <action>Create list, get, and create handlers. Use User type from model.</action>
-  <verify>request tests pass for all handlers</verify>
+  <name>Task 2: Create User service endpoints</name>
+  <files>src/features/user/api.ext</files>
+  <action>GET /users (list), GET /users/:id (single), POST /users (create). Use User type from model.</action>
+  <verify>curl tests pass for all endpoints</verify>
   <done>All CRUD operations work</done>
 </task>
 </tasks>
 
 <verification>
 - [ ] run-build succeeds
-- [ ] handlers respond correctly
+- [ ] service endpoints respond correctly
 </verification>
 
 <success_criteria>
@@ -361,7 +370,7 @@ plan: 03
 type: execute
 wave: 2
 depends_on: ["03-01", "03-02"]
-files_modified: [src/modules/control-panel/entry.ext]
+files_modified: [src/modules/ControlPanel.ext]
 autonomous: false
 ---
 
@@ -373,9 +382,9 @@ Output: Working control-panel module.
 </objective>
 
 <execution_context>
-@workflows/execute-plan.md
-@templates/SUMMARY.md
-@references/checkpoints.md
+@~/.claude/gsd/workflows/execute-plan.md
+@~/.claude/gsd/templates/summary.md
+@~/.claude/gsd/references/checkpoints.md
 </execution_context>
 
 <context>
@@ -387,9 +396,9 @@ Output: Working control-panel module.
 
 <tasks>
 <task type="auto">
-  <name>Task 1: Build control-panel layout</name>
-  <files>src/modules/control-panel/entry.ext</files>
-  <action>Create responsive layout with user and product sections. Use project styling system.</action>
+  <name>Task 1: Build Control Panel layout</name>
+  <files>src/modules/ControlPanel.ext</files>
+  <action>Create responsive grid with UserList and ProductList modules. Use StyleFramework for styling.</action>
   <verify>run-build succeeds</verify>
   <done>Control Panel renders without errors</done>
 </task>
@@ -398,8 +407,8 @@ Output: Working control-panel module.
   <what-built>Responsive control-panel with user and product sections</what-built>
   <how-to-verify>
     1. Run: run-dev
-    2. Open: http://localhost:3000/control-panel
-    3. Desktop: Verify two-column layout
+    2. Visit: http://localhost:3000/control-panel
+    3. Desktop: Verify two-column grid
     4. Mobile: Verify stacked layout
     5. Check: No layout shift, no scroll issues
   </how-to-verify>
@@ -434,13 +443,14 @@ depends_on: ["03-01"]  # Just because 01 comes before 02
 **Bad: Horizontal layer grouping**
 ```
 Plan 01: All models
-Plan 02: All handlers (depends on 01)
-Plan 03: All modules
+Plan 02: All APIs (depends on 01)
+Plan 03: All UIs (depends on 02)
 ```
 
 **Bad: Missing autonomy flag**
 ```yaml
 # Has checkpoint but no autonomous: false
+depends_on: []
 files_modified: [...]
 # autonomous: ???  <- Missing!
 ```
@@ -472,27 +482,31 @@ When a plan introduces external services requiring human configuration, declare 
 
 ```yaml
 user_setup:
-  - service: external-service
-    why: "Service requires human-managed credentials"
+  - service: payments-provider
+    why: "Payment processing requires service keys"
     env_vars:
-      - name: EXTERNAL_API_KEY
-        source: "Service console or provider portal"
+      - name: PAYMENTS_API_KEY
+        source: "PaymentsProvider Control Panel → Developers → service keys → Secret key"
+      - name: PAYMENTS_WEBHOOK_SECRET
+        source: "PaymentsProvider Control Panel → Developers → Webhooks → Signing secret"
     dashboard_config:
       - task: "Create callback endpoint"
-        location: "Service console > settings > callbacks"
-        details: "URL: https://[your-domain]/callbacks/provider"
+        location: "PaymentsProvider Control Panel → Developers → Webhooks → Add endpoint"
+        details: "URL: https://[your-domain]/callbacks/payments-provider"
     local_dev:
-      - "service-cli listen --forward-to localhost:3000/callbacks/provider"
+      - "payments-provider listen --forward-to localhost:3000/callbacks/payments-provider"
 ```
 
-**Automation-first rule:** `user_setup` contains ONLY what assistant literally cannot do:
+**The automation-first rule:** `user_setup` contains ONLY what assistant literally cannot do:
 - Account creation (requires human signup)
-- Secret retrieval (requires portal access)
-- Console configuration (requires human in browser)
+- Secret retrieval (requires control-panel access)
+- Control Panel configuration (requires human in browser)
 
 **NOT included:** Package installs, code changes, file creation, CLI commands assistant can run.
 
-**Result:** Execute-phase generates `{phase}-USER-SETUP.md` with checklist for the user.
+**Result:** Execute-plan generates `{phase}-USER-SETUP.md` with checklist for the user.
+
+See `~/.claude/gsd/templates/user-setup.md` for full schema and examples
 
 ---
 
@@ -514,19 +528,19 @@ must_haves:
       min_lines: 30
     - path: "src/services/chat/handler.ext"
       provides: "Message CRUD operations"
-      exports: ["READ", "WRITE"]
+      exports: ["GET", "POST"]
     - path: "orm/schema.orm"
       provides: "Message model"
       contains: "model Message"
   key_links:
     - from: "src/modules/Chat.ext"
-      to: "service:chat"
+      to: "/service/chat"
       via: "service call in lifecycle hook"
-      pattern: "callService.*chat"
+      pattern: "callService.*service/chat"
     - from: "src/services/chat/handler.ext"
-      to: "data-store:message"
-      via: "data query"
-      pattern: "data\.message\.(find|create)"
+      to: "orm-tool.message"
+      via: "database query"
+      pattern: "orm-tool\\.message\\.(find|create)"
 ```
 
 **Field descriptions:**
@@ -548,13 +562,15 @@ must_haves:
 
 **Why this matters:**
 
-Task completion != goal achievement. A task "create chat module" can complete by creating a placeholder. The `must_haves` field captures what must actually work, enabling verification to catch gaps before they compound.
+Task completion ≠ Goal achievement. A task "create chat module" can complete by creating a placeholder. The `must_haves` field captures what must actually work, enabling verification to catch gaps before they compound.
 
 **Verification flow:**
 
 1. Plan-phase derives must_haves from phase goal (goal-backward)
 2. Must_haves written to PLAN.md frontmatter
 3. Execute-phase runs all plans
-4. Verification pass checks must_haves against codebase
-5. Gaps found -> fix plans created -> execute -> re-verify
-6. All must_haves pass -> phase complete
+4. Verification subagent checks must_haves against codebase
+5. Gaps found → fix plans created → execute → re-verify
+6. All must_haves pass → phase complete
+
+See `~/.claude/gsd/workflows/verify-phase.md` for verification logic.
