@@ -1,4 +1,4 @@
-# Neutral Structure (Recommended)
+# Structure (Recommended)
 
 ```
 planning/

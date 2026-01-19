@@ -1,4 +1,4 @@
-# Plan Phase (Neutral)
+# Plan Phase
 
 ## Inputs
 - Context

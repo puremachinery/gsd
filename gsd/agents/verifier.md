@@ -1,4 +1,4 @@
-# Verifier (Neutral)
+# Verifier
 
 ## Role
 Validate that artifacts are real, wired, and functional.

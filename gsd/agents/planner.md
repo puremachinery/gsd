@@ -1,4 +1,4 @@
-# Planner (Neutral)
+# Planner
 
 ## Role
 Create executable plans with explicit files, actions, and verification.

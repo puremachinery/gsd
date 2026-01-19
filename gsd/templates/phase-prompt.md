@@ -1,4 +1,4 @@
-# Phase Prompt Template (Neutral)
+# Phase Prompt Template
 
 > **Note:** Planning methodology lives in `agents/planner.md`.
 > This template defines the PLAN.md output format.

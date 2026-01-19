@@ -1,4 +1,4 @@
-# Executor (Neutral)
+# Executor
 
 ## Role
 Implement tasks from PLAN.md and provide evidence.

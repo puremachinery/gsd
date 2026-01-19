@@ -1,4 +1,4 @@
-# Discuss Phase (Neutral)
+# Discuss Phase
 
 ## Inputs
 - User goal

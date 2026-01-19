@@ -1,14 +1,15 @@
-# Neutral GSD Core (Skeleton)
+# GSD Core (Skeleton)
 
 Purpose: stack-agnostic planning and verification framework for autonomous assistants.
 
-This folder is a clean, neutral baseline. It intentionally avoids stack, vendor, or tool bias.
+This folder is the baseline. It intentionally avoids stack, vendor, or tool bias.
 Use it as the source of truth for new content. Port legacy material only after it passes the
-neutrality checklist in FRAMEWORK.md.
+bias checklist in FRAMEWORK.md.
 
 ## Scope
 - Planning, execution, verification, and transition workflows
 - Templates for plan, requirements, verification, summary, and decisions
+- Codebase audit templates (architecture, stack, structure, testing, concerns, integrations)
 - Minimal agent role definitions (planner, executor, verifier, researcher, debugger)
 
 ## Non-Goals

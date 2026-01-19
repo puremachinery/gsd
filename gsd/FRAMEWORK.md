@@ -1,7 +1,7 @@
-# Neutral Framework
+# Core Framework
 
 ## Principles
-- Neutral by default: no vendor, language, or framework bias.
+- Default: avoid vendor, language, or framework bias.
 - Explicit placeholders: use [Placeholders] and replace per project.
 - Evidence over existence: verify that artifacts are real, wired, and functional.
 - Human steps are last resort: prefer automation where possible.
@@ -26,7 +26,7 @@
 - Handler: entry point for requests or events
 - Wire: explicit connection between artifacts
 
-## Neutrality Checklist
+## Bias Checklist
 - No vendor, framework, or language names
 - No toolchain-specific commands
 - No file paths tied to a specific stack

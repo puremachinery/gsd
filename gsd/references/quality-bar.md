@@ -1,4 +1,4 @@
-# Quality Bar (Neutral)
+# Quality Bar
 
 ## Must-haves
 - Tasks specify files, actions, verify, done
