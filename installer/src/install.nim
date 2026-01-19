@@ -265,7 +265,7 @@ proc writeVersionFile(configDir: string): bool =
     return false
 
 proc cleanupOldFiles(configDir: string, verbose: bool) =
-  ## Remove old Node.js files from previous installations
+  ## Remove legacy hook files from previous installations
   let oldFiles = [
     configDir / "hooks" / "statusline.js",
     configDir / "hooks" / "gsd-check-update.js",

@@ -2,14 +2,14 @@
 
 > **Comprehensive reference.** Core rules auto-load from `.claude/rules/`. This document provides deep explanations and examples for when you need the full picture.
 
-This document explains how GSD is written so future Claude instances can contribute consistently.
+This document explains how GSD is written so future assistant instances can contribute consistently.
 
 ## Core Philosophy
 
-GSD is a **meta-prompting system** where every file is both implementation and specification. Files teach Claude how to build software systematically. The system optimizes for:
+GSD is a **meta-prompting system** where every file is both implementation and specification. Files teach assistant how to build software systematically. The system optimizes for:
 
-- **Solo developer + Claude workflow** (no enterprise patterns)
-- **Context engineering** (manage Claude's context window deliberately)
+- **Solo developer + assistant workflow** (no enterprise patterns)
+- **Context engineering** (manage assistant's context window deliberately)
 - **Plans as prompts** (PLAN.md files are executable, not documents to transform)
 
 ---
@@ -111,7 +111,7 @@ Build authentication system
 ```xml
 <task type="auto">
   <name>Task N: Action-oriented name</name>
-  <files>src/path/file.ts, src/other/file.ts</files>
+  <files>src/path/file.ext, src/other/file.ext</files>
   <action>What to do, what to avoid and WHY</action>
   <verify>Command or check to prove completion</verify>
   <done>Measurable acceptance criteria</done>
@@ -119,7 +119,7 @@ Build authentication system
 ```
 
 **Task types:**
-- `type="auto"` — Claude executes autonomously
+- `type="auto"` — assistant executes autonomously
 - `type="checkpoint:human-verify"` — User must verify
 - `type="checkpoint:decision"` — User must choose
 
@@ -173,7 +173,7 @@ Build authentication system
 @.planning/DISCOVERY.md (if exists)
 ```
 
-**@-references are lazy loading signals.** They tell Claude what to read, not pre-loaded content.
+**@-references are lazy loading signals.** They tell assistant what to read, not pre-loaded content.
 
 ---
 
@@ -212,7 +212,7 @@ Present: Factual statements, verification results, direct answers
 
 ### Brevity with Substance
 
-**Good one-liner:** "JWT auth with refresh rotation using jose library"
+**Good one-liner:** "JWT auth with refresh rotation using token-signing library"
 
 **Bad one-liner:** "Phase complete" or "Authentication implemented"
 
@@ -274,9 +274,9 @@ Use subagents for autonomous work. Reserve main context for user interaction.
 <!-- GOOD -->
 <task type="auto">
   <name>Create login endpoint with JWT</name>
-  <files>src/app/api/auth/login/route.ts</files>
-  <action>POST endpoint accepting {email, password}. Query User by email, compare password with bcrypt. On match, create JWT with jose library, set as httpOnly cookie. Return 200. On mismatch, return 401.</action>
-  <verify>curl -X POST localhost:3000/api/auth/login returns 200 with Set-Cookie header</verify>
+  <files>src/services/auth/login/handler.ext</files>
+  <action>POST endpoint accepting {email, password}. Query User by email, compare password with bcrypt. On match, create JWT with token-signing library, set as httpOnly cookie. Return 200. On mismatch, return 401.</action>
+  <verify>curl -X POST localhost:3000/service/auth/login returns 200 with Set-Cookie header</verify>
   <done>Valid credentials → 200 + cookie. Invalid → 401.</done>
 </task>
 ```
@@ -422,7 +422,7 @@ How to make tests pass
 3. **Commands delegate to workflows**
 4. **Progressive disclosure hierarchy**
 5. **Imperative, brief, technical** — no filler, no sycophancy
-6. **Solo developer + Claude** — no enterprise patterns
+6. **Solo developer + assistant** — no enterprise patterns
 7. **Context size as quality constraint** — split aggressively
 8. **Temporal language banned** — current state only
 9. **Plans ARE prompts** — executable, not documents
