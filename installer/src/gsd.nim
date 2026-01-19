@@ -5,9 +5,9 @@ import std/[os, strutils, parseopt, options, json]
 import config, install, statusline, update
 
 const
-  HelpText = """
+HelpText = """
 GSD - Get Stuff Done
-A meta-prompting system for Claude Code
+A meta-prompting system for Claude Code (Codex CLI planned)
 
 Usage: gsd <command> [options]
 
@@ -118,7 +118,7 @@ proc cmdInstall(args: seq[string]) =
 
   if result.success:
     echo ""
-    echo "Done! Run /gsd:help in Claude Code to get started."
+    echo "Done! Use your tool's GSD entry point to get started (e.g., /gsd:help in Claude Code)."
   else:
     stderr.writeLine "Error: ", result.message
     quit(1)

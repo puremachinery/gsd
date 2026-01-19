@@ -159,7 +159,7 @@ Format completion message:
 ║  GSD Updated: vX.Y.Z → vX.Y.Z+1                           ║
 ╚═══════════════════════════════════════════════════════════╝
 
-Restart Claude Code to pick up the new commands.
+Restart your tool (Claude Code; Codex CLI planned) to pick up the new commands.
 
 View full changelog: https://github.com/puremachinery/gsd/blob/master/CHANGELOG.md
 ```

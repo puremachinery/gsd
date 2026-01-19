@@ -17,7 +17,7 @@ Output ONLY the reference content below. Do NOT add:
 <reference>
 # GSD Command Reference
 
-**GSD** (Get Shit Done) creates hierarchical project plans optimized for solo agentic development with Claude Code.
+**GSD** (Get Shit Done) creates hierarchical project plans optimized for solo agentic development with supported tools (Claude Code; Codex CLI planned).
 
 ## Quick Start
 
@@ -100,10 +100,10 @@ Comprehensive ecosystem research for niche/complex domains.
 Usage: `/gsd:research-phase 3`
 
 **`/gsd:list-phase-assumptions <number>`**
-See what Claude is planning to do before it starts.
+See what assistant is planning to do before it starts.
 
-- Shows Claude's intended approach for a phase
-- Lets you course-correct if Claude misunderstood your vision
+- Shows assistant's intended approach for a phase
+- Lets you course-correct if assistant misunderstood your vision
 - No files created - conversational output only
 
 Usage: `/gsd:list-phase-assumptions 3`
@@ -140,7 +140,7 @@ Add new phase to end of current milestone.
 - Uses next sequential number
 - Updates phase directory structure
 
-Usage: `/gsd:add-phase "Add admin dashboard"`
+Usage: `/gsd:add-phase "Add admin control-panel"`
 
 **`/gsd:insert-phase <after> <description>`**
 Insert urgent work as decimal phase between existing phases.

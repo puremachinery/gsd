@@ -1,7 +1,7 @@
 # Package
 version       = "0.1.0"
 author        = "Zera Alexander"
-description   = "GSD installer and hooks for Claude Code"
+description   = "GSD installer and hooks for Claude Code (Codex CLI planned)"
 license       = "MIT"
 srcDir        = "src"
 bin           = @["gsd"]

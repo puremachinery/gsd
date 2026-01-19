@@ -4,7 +4,7 @@
 
 **Get Stuff Done.** *(Or, you know, the other version.)*
 
-A meta-prompting and context engineering system for Claude Code and Codex CLI.
+A meta-prompting and context engineering system for Claude Code (Codex CLI integration planned).
 
 [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
 
@@ -25,20 +25,20 @@ The system provides:
 
 ## Status
 
-**Work in progress.** The installer is being rewritten in Nim to remove Node.js dependencies.
+**Active.** The installer is a native Nim binary; releases bundle the binary and all prompt content.
 
-The prompt engineering content (commands, workflows, templates, agents) is functional and derived from [glittercowboy/get-shit-done](https://github.com/glittercowboy/get-shit-done).
+**Next:** After this milestone lands tonight, Codex CLI integration is planned for tomorrow.
 
 ## Platforms
 
 | Platform | Status |
 |----------|--------|
-| Claude Code | Primary target |
+| Claude Code | Supported |
 | Codex CLI | Planned |
 
 ## Installation
 
-*Coming soon.* Once the Nim installer is complete, download the release bundle for your platform from:
+Download the release bundle for your platform from:
 
 https://github.com/puremachinery/gsd/releases
 
