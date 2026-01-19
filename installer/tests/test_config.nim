@@ -1,20 +1,22 @@
 ## Tests for config.nim
 
-import std/[unittest, os, strutils]
+import std/[unittest, os, strutils, options]
 import ../src/config
 
 suite "expandPath":
   test "tilde alone expands to home directory":
     let result = expandPath("~")
-    check result == getHomeDir()
+    # normalizedPath removes trailing slashes
+    check result == getHomeDir().normalizedPath
 
   test "tilde with path expands correctly":
     let result = expandPath("~/foo/bar")
-    check result == getHomeDir() / "foo/bar"
+    check result == (getHomeDir() / "foo/bar").normalizedPath
 
   test "tilde with trailing slash":
     let result = expandPath("~/")
-    check result == getHomeDir() / ""
+    # ~/ expands to home dir (normalized, no trailing slash)
+    check result == getHomeDir().normalizedPath
 
   test "tilde username style returns as-is":
     let result = expandPath("~otheruser/path")
@@ -56,3 +58,61 @@ suite "Version constant":
   test "version is defined":
     check Version.len > 0
     check Version.contains(".")
+
+suite "expandPath Windows compatibility":
+  # These tests verify the function handles various path formats
+  # that could appear on Windows or Unix systems
+
+  test "handles forward slashes":
+    let result = expandPath("~/foo/bar/baz")
+    check result.contains("foo")
+    check result.contains("bar")
+
+  test "handles paths with dots":
+    let result = expandPath("./relative/path")
+    check result == "./relative/path"
+
+  test "handles paths with parent refs":
+    let result = expandPath("../parent/path")
+    check result == "../parent/path"
+
+  test "does not expand tilde in middle of path":
+    let result = expandPath("/some/~path/file")
+    check result == "/some/~path/file"
+
+suite "config round-trip":
+  test "saveConfig and loadConfig work together":
+    # Create temp directory for test
+    let tempDir = getTempDir() / "gsd_test_config"
+    createDir(tempDir)
+    defer: removeDir(tempDir)
+
+    let config = GsdConfig(
+      version: "1.2.3",
+      installType: itLocal,
+      configDir: "/test/path",
+      installedAt: "2025-01-01T00:00:00Z"
+    )
+
+    check saveConfig(config, tempDir) == true
+
+    let loaded = loadConfig(tempDir)
+    check loaded.isSome
+    check loaded.get().version == "1.2.3"
+    check loaded.get().installType == itLocal
+    check loaded.get().configDir == "/test/path"
+    check loaded.get().installedAt == "2025-01-01T00:00:00Z"
+
+  test "loadConfig returns none for missing file":
+    let result = loadConfig("/nonexistent/path")
+    check result.isNone
+
+  test "loadConfig returns none for invalid JSON":
+    let tempDir = getTempDir() / "gsd_test_invalid"
+    createDir(tempDir)
+    defer: removeDir(tempDir)
+
+    writeFile(tempDir / "gsd-config.json", "not valid json")
+
+    let result = loadConfig(tempDir)
+    check result.isNone

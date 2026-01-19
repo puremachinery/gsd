@@ -1,6 +1,6 @@
 ## Tests for install.nim
 
-import std/[unittest, json, options, strutils]
+import std/[unittest, json, options, strutils, os]
 import ../src/install
 
 suite "isOldGsdStatusline":
@@ -231,3 +231,53 @@ suite "mergeStatusline":
 
     check config["command"].getStr() == "gsd statusline #gsd"
     check changed == true
+
+suite "rewritePathReferences":
+  test "global install keeps paths unchanged":
+    let content = "@~/.claude/gsd/workflows/execute.md"
+    let result = rewritePathReferences(content, "global", "")
+
+    check result == "@~/.claude/gsd/workflows/execute.md"
+
+  test "local install converts to relative paths":
+    let content = "@~/.claude/gsd/workflows/execute.md"
+    let result = rewritePathReferences(content, "local", "")
+
+    check result == "@.claude/gsd/workflows/execute.md"
+
+  test "local install converts non-@ references too":
+    let content = "See ~/.claude/gsd/templates/ for more info"
+    let result = rewritePathReferences(content, "local", "")
+
+    check result == "See .claude/gsd/templates/ for more info"
+
+  test "custom install uses custom path":
+    let content = "@~/.claude/gsd/workflows/execute.md"
+    let result = rewritePathReferences(content, "custom", "/opt/myconfig")
+
+    check result == "@/opt/myconfig/gsd/workflows/execute.md"
+
+  test "custom install handles non-@ references":
+    let content = "Located at ~/.claude/gsd/references/"
+    let result = rewritePathReferences(content, "custom", "/home/user/custom")
+
+    check result == "Located at /home/user/custom/gsd/references/"
+
+  test "handles multiple references in one file":
+    let content = """
+@~/.claude/gsd/workflows/execute.md
+@~/.claude/gsd/templates/plan.md
+See ~/.claude/ for config
+"""
+    let result = rewritePathReferences(content, "local", "")
+
+    check result.contains("@.claude/gsd/workflows/execute.md")
+    check result.contains("@.claude/gsd/templates/plan.md")
+    check result.contains("See .claude/ for config")
+
+  test "does not affect other paths":
+    let content = "@/usr/local/bin/something ~/other/path"
+    let result = rewritePathReferences(content, "local", "")
+
+    check result.contains("@/usr/local/bin/something")
+    check result.contains("~/other/path")  # Only ~/.claude/ is rewritten

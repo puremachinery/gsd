@@ -6,17 +6,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Planned
-- Native installer in Nim
-- Multi-platform support (Claude Code + Codex CLI planned)
-- `gsd-config.json` for proper config directory resolution
-- Split-brain handling for local vs global installs
-- GitHub API update checking
-- ETag caching and GITHUB_TOKEN support for rate limits
+### Added
+- Native installer in Nim (replaces Node.js)
+- Multi-platform support (macOS ARM/Intel, Linux, Windows)
+- `gsd-config.json` for config directory resolution
+- Support for local, global, and custom config directories
+- GitHub API update checking with ETag caching
+- `GITHUB_TOKEN` support for higher rate limits
 - Auto-migration of old GSD statusline configurations
 - Windows virtual terminal processing for ANSI colors
 - Settings.json merge preserves user's custom hooks
 - Invalid settings.json backed up instead of silently replaced
+- Path rewriting for @-references based on install type
+- `gsd doctor` command for installation health checks
+- Comprehensive test suite for installer
+
+### Changed
+- Platform-agnostic prompt content separated from installer
+
+### Removed
+- Node.js dependency
+- Legacy `hooks/` directory structure
 
 ---
 

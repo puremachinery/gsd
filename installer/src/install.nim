@@ -334,7 +334,7 @@ const
     "gsd-planner.md"
   ]
 
-proc rewritePathReferences(content, installType, configDir: string): string =
+proc rewritePathReferences*(content, installType, configDir: string): string =
   ## Rewrite ~/.claude/gsd/ references based on install type
   ## For local installs, use relative paths
   ## For custom installs, use the actual custom config path

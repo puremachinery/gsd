@@ -23,14 +23,29 @@ const
   VersionFileName* = "VERSION"
 
 proc expandPath*(path: string): string =
-  ## Expand ~ to home directory
+  ## Expand home directory references to absolute paths
+  ## Handles:
+  ##   ~ and ~/path (Unix style)
+  ##   %USERPROFILE% (Windows style)
+
+  # Handle ~ expansion (works on both platforms via getHomeDir)
   if path == "~":
-    return getHomeDir()
-  elif path.startsWith("~/"):
-    return getHomeDir() / path[2..^1]
+    return getHomeDir().normalizedPath
+  elif path.startsWith("~/") or path.startsWith("~\\"):
+    return (getHomeDir() / path[2..^1]).normalizedPath
   elif path.startsWith("~"):
     # ~username style - not supported, return as-is
     return path
+
+  # Handle Windows %USERPROFILE%
+  when defined(windows):
+    if path.startsWith("%USERPROFILE%"):
+      let home = getHomeDir()
+      if path == "%USERPROFILE%":
+        return home.normalizedPath
+      elif path.len > 13 and path[13] in {'/', '\\'}:
+        return (home / path[14..^1]).normalizedPath
+
   return path
 
 proc getLocalConfigDir*(): string =
