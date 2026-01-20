@@ -2,6 +2,7 @@
 ## Reads JSON from stdin, outputs formatted ANSI statusline
 
 import std/[json, options, strutils, os, nre]
+import config
 
 when defined(windows):
   import std/winlean
@@ -196,6 +197,8 @@ proc runStatusline*(configDir: string = "") =
   when defined(windows):
     vtEnabled = enableVirtualTerminal()
 
+  let resolvedConfigDir = if configDir.len > 0: expandPath(configDir) else: ""
+
   # Read JSON from stdin
   var jsonInput = ""
   try:
@@ -215,7 +218,7 @@ proc runStatusline*(configDir: string = "") =
     echo ""
     return
 
-  var output = formatStatusline(input.get(), configDir)
+  var output = formatStatusline(input.get(), resolvedConfigDir)
 
   # Strip ANSI codes on Windows if VT mode failed
   when defined(windows):

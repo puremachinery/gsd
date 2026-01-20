@@ -1,28 +1,95 @@
 ## GSD - Get Stuff Done
 ## CLI entry point for installer and hooks
 
-import std/[os, strutils, parseopt, options, json]
-import config, install, statusline, update
+import std/[os, strutils, parseopt, options, json, terminal]
+import config, install, statusline, update, platform
+
+proc isInteractive(): bool =
+  ## Check if stdin is a TTY (interactive terminal)
+  try:
+    return isatty(stdin)
+  except:
+    return false
+
+proc promptPlatformChoice(): PlatformChoice =
+  ## Prompt user to select platform(s) for installation
+  echo ""
+  echo "Select platform to install GSD:"
+  echo "  1) Claude Code (~/.claude/)"
+  echo "  2) Codex CLI (~/.codex/)"
+  echo "  3) Both"
+  echo ""
+  stdout.write "Enter choice [1-3]: "
+  stdout.flushFile()
+
+  let input = stdin.readLine().strip()
+
+  case input
+  of "1", "claude":
+    return pcClaude
+  of "2", "codex":
+    return pcCodex
+  of "3", "both", "all":
+    return pcBoth
+  else:
+    echo "Invalid choice. Defaulting to Claude Code."
+    return pcClaude
+
+proc promptUninstallChoice(installed: seq[Platform]): seq[Platform] =
+  ## Prompt user to select platform(s) for uninstallation
+  if installed.len == 0:
+    return @[]
+
+  if installed.len == 1:
+    return installed
+
+  echo ""
+  echo "GSD is installed for multiple platforms. Select which to uninstall:"
+  var idx = 1
+  for p in installed:
+    let dir = platform.getGlobalConfigDir(p)
+    echo "  ", idx, ") ", $p, " (", dir, ")"
+    idx.inc
+  echo "  ", idx, ") All"
+  echo ""
+  stdout.write "Enter choice [1-", idx, "]: "
+  stdout.flushFile()
+
+  let input = stdin.readLine().strip()
+
+  try:
+    let choice = parseInt(input)
+    if choice >= 1 and choice <= installed.len:
+      return @[installed[choice - 1]]
+    elif choice == idx:
+      return installed
+  except ValueError:
+    discard
+
+  echo "Invalid choice. Aborting."
+  quit(1)
 
 const
   HelpText = """
 GSD - Get Stuff Done
-A meta-prompting system for Claude Code (Codex CLI planned)
+A meta-prompting system for Claude Code and Codex CLI
 
 Usage: gsd <command> [options]
 
 Commands:
   install       Install GSD to config directory
   uninstall     Remove GSD from config directory
+  update        Update all installed platforms
   doctor        Validate installation health
-  check-update  Check for available updates
+  check-update  Check for available updates (silent)
   statusline    Output formatted statusline (called by hook)
 
 Install options:
-  -g, --global              Install to ~/.claude (default)
-  -l, --local               Install to ./.claude
+  -g, --global              Install to ~/.<platform> (default)
+  -l, --local               Install to ./.<platform>
   -c, --config-dir <path>   Custom config directory
-  --force-statusline        Replace existing statusline
+  -p, --platform <name>     Target: claude, codex, or both
+  --force-statusline        Replace existing statusline (Claude only)
   --verbose                 Verbose output
 
 Other options:
@@ -30,9 +97,11 @@ Other options:
   -v, --version             Show version
 
 Examples:
-  gsd install --global      Standard global install
-  gsd install --local       Project-only install
-  gsd doctor                Check installation health
+  gsd install                       Interactive platform selection
+  gsd install --platform=both       Install for both platforms
+  gsd install --platform=codex      Install for Codex CLI only
+  gsd update                        Update all installed platforms
+  gsd doctor                        Check all installations
 """
 
 proc showHelp() =
@@ -65,11 +134,15 @@ proc findSourceDir(): string =
   return getCurrentDir()
 
 proc cmdInstall(args: seq[string]) =
-  var opts = InstallOptions(
+  var baseOpts = InstallOptions(
     installType: itGlobal,
+    platform: pClaudeCode,
     forceStatusline: false,
     verbose: false
   )
+
+  var platformExplicit = false
+  var platformChoice = pcClaude
 
   var p = initOptParser(args)
   while true:
@@ -79,24 +152,32 @@ proc cmdInstall(args: seq[string]) =
     of cmdShortOption, cmdLongOption:
       case p.key
       of "g", "global":
-        opts.installType = itGlobal
+        baseOpts.installType = itGlobal
       of "l", "local":
-        opts.installType = itLocal
+        baseOpts.installType = itLocal
       of "c", "config-dir":
-        opts.configDir = p.val
-        opts.installType = itCustom
+        baseOpts.configDir = p.val
+        baseOpts.installType = itCustom
+      of "p", "platform":
+        try:
+          platformChoice = parsePlatformChoice(p.val)
+          platformExplicit = true
+        except ValueError as e:
+          stderr.writeLine "Error: ", e.msg
+          quit(1)
       of "force-statusline":
-        opts.forceStatusline = true
+        baseOpts.forceStatusline = true
       of "verbose":
-        opts.verbose = true
+        baseOpts.verbose = true
       of "h", "help":
         echo "Usage: gsd install [options]"
         echo ""
         echo "Options:"
-        echo "  -g, --global              Install to ~/.claude (default)"
-        echo "  -l, --local               Install to ./.claude"
+        echo "  -g, --global              Install to ~/.<platform> (default)"
+        echo "  -l, --local               Install to ./.<platform>"
         echo "  -c, --config-dir <path>   Custom config directory"
-        echo "  --force-statusline        Replace existing statusline"
+        echo "  -p, --platform <name>     Target: claude, codex, or both"
+        echo "  --force-statusline        Replace existing statusline (Claude only)"
         echo "  --verbose                 Verbose output"
         quit(0)
       else:
@@ -104,6 +185,14 @@ proc cmdInstall(args: seq[string]) =
         quit(1)
     of cmdArgument:
       discard
+
+  # Prompt for platform if interactive and not explicitly specified
+  if not platformExplicit:
+    if isInteractive():
+      platformChoice = promptPlatformChoice()
+    else:
+      # Non-interactive: default to Claude Code
+      platformChoice = pcClaude
 
   let sourceDir = findSourceDir()
 
@@ -114,19 +203,46 @@ proc cmdInstall(args: seq[string]) =
     stderr.writeLine "or that the binary is located alongside the gsd/ and commands/ directories."
     quit(1)
 
-  let result = install(sourceDir, opts)
+  # Install to selected platform(s)
+  let platforms = platformChoiceToSeq(platformChoice)
+  var allSuccess = true
+  var installedPlatforms: seq[Platform] = @[]
 
-  if result.success:
+  for targetPlatform in platforms:
+    var opts = baseOpts
+    opts.platform = targetPlatform
+
+    let result = install(sourceDir, opts)
+
+    if result.success:
+      installedPlatforms.add(targetPlatform)
+    else:
+      stderr.writeLine "Error installing for ", $targetPlatform, ": ", result.message
+      allSuccess = false
+
+  # Show summary
+  if installedPlatforms.len > 0:
     echo ""
-    echo "Done! Use your tool's GSD entry point to get started (e.g., /gsd:help in Claude Code)."
-  else:
-    stderr.writeLine "Error: ", result.message
+    for p in installedPlatforms:
+      case p
+      of pClaudeCode:
+        echo "Claude Code: Use /gsd:help to get started."
+      of pCodexCli:
+        echo "Codex CLI: Use /prompts:gsd-help to get started."
+
+  if not allSuccess:
     quit(1)
 
 proc cmdUninstall(args: seq[string]) =
   var configDir = ""
   var verbose = false
+  var platformChoice = pcClaude
+  var platformExplicit = false
+  var useGlobal = false
+  var useLocal = false
+  var uninstallAll = false
 
+  # First pass: parse all flags
   var p = initOptParser(args)
   while true:
     p.next()
@@ -135,11 +251,24 @@ proc cmdUninstall(args: seq[string]) =
     of cmdShortOption, cmdLongOption:
       case p.key
       of "g", "global":
-        configDir = getGlobalConfigDir()
+        useGlobal = true
+        useLocal = false
       of "l", "local":
-        configDir = getLocalConfigDir()
+        useLocal = true
+        useGlobal = false
       of "c", "config-dir":
         configDir = p.val
+        useGlobal = false
+        useLocal = false
+      of "p", "platform":
+        try:
+          platformChoice = parsePlatformChoice(p.val)
+          platformExplicit = true
+        except ValueError as e:
+          stderr.writeLine "Error: ", e.msg
+          quit(1)
+      of "all":
+        uninstallAll = true
       of "verbose":
         verbose = true
       else:
@@ -147,59 +276,92 @@ proc cmdUninstall(args: seq[string]) =
     of cmdArgument:
       discard
 
-  # If no explicit dir, try to find one
-  if configDir.len == 0:
-    let found = findConfigDir()
-    if found.isNone:
+  # Normalize explicit config dir if provided
+  if configDir.len > 0:
+    configDir = expandPath(configDir)
+    # Uninstall from specific config dir
+    let cfg = loadConfig(configDir)
+    let targetPlatform = if cfg.isSome: cfg.get().platform else: pClaudeCode
+    discard uninstall(configDir, verbose, targetPlatform)
+    return
+
+  # Handle --all flag
+  if uninstallAll:
+    let installed = findInstalledPlatforms()
+    if installed.len == 0:
       stderr.writeLine "Error: No GSD installation found."
       quit(1)
-    configDir = found.get()
 
-  discard uninstall(configDir, verbose)
+    for plat in installed:
+      let found = findConfigDir(plat)
+      if found.isSome:
+        discard uninstall(found.get(), verbose, plat)
+    return
 
-proc cmdDoctor(args: seq[string]) =
-  ## Validate installation health
-  var configDir = ""
+  # Handle explicit platform choice (may include "both")
+  if platformExplicit:
+    let platforms = platformChoiceToSeq(platformChoice)
 
-  var p = initOptParser(args)
-  while true:
-    p.next()
-    case p.kind
-    of cmdEnd: break
-    of cmdShortOption, cmdLongOption:
-      case p.key
-      of "c", "config-dir":
-        configDir = p.val
+    for plat in platforms:
+      var targetDir: string
+      if useGlobal:
+        targetDir = platform.getGlobalConfigDir(plat)
+      elif useLocal:
+        targetDir = platform.getLocalConfigDir(plat)
       else:
-        discard
-    of cmdArgument:
-      discard
+        let found = findConfigDir(plat)
+        if found.isNone:
+          stderr.writeLine "Error: No GSD installation found for ", $plat, "."
+          continue
+        targetDir = found.get()
 
-  # Find config directory
-  let resolvedDir = if configDir.len > 0:
-    expandPath(configDir)
+      discard uninstall(targetDir, verbose, plat)
+    return
+
+  # No explicit options - check what's installed
+  let installed = findInstalledPlatforms()
+
+  if installed.len == 0:
+    stderr.writeLine "Error: No GSD installation found."
+    quit(1)
+
+  # If only one platform installed, uninstall it
+  if installed.len == 1:
+    let plat = installed[0]
+    let found = findConfigDir(plat)
+    if found.isSome:
+      discard uninstall(found.get(), verbose, plat)
+    return
+
+  # Multiple platforms installed - prompt if interactive
+  if isInteractive():
+    let toUninstall = promptUninstallChoice(installed)
+    for plat in toUninstall:
+      let found = findConfigDir(plat)
+      if found.isSome:
+        discard uninstall(found.get(), verbose, plat)
   else:
-    let found = findConfigDir()
-    if found.isNone:
-      echo "No GSD installation found."
-      echo ""
-      echo "Run 'gsd install' to install GSD."
-      quit(1)
-    found.get()
+    # Non-interactive with multiple platforms - require explicit choice
+    stderr.writeLine "Error: Multiple GSD installations found. Specify --platform or --all."
+    quit(1)
 
-  echo "Checking GSD installation at ", resolvedDir, "..."
-  echo ""
-
+proc runDoctorForPlatform(resolvedDir: string, targetPlatform: Platform): tuple[issues: seq[string], warnings: seq[string]] =
+  ## Run health check for a single platform installation
+  ## Returns (issues, warnings) lists
   var issues: seq[string] = @[]
   var warnings: seq[string] = @[]
+
+  # Load config
+  let cfg = loadConfig(resolvedDir)
 
   # Check gsd-config.json
   let configPath = resolvedDir / ConfigFileName
   if fileExists(configPath):
     echo "[OK] gsd-config.json exists"
-    let cfg = loadConfig(resolvedDir)
     if cfg.isNone:
       issues.add("gsd-config.json is corrupted")
+    else:
+      echo "[OK] Platform: ", $cfg.get().platform
   else:
     issues.add("gsd-config.json missing")
 
@@ -223,94 +385,268 @@ proc cmdDoctor(args: seq[string]) =
   else:
     issues.add("gsd/ directory missing")
 
-  # Check commands/gsd/
-  let commandsDir = resolvedDir / "commands" / "gsd"
-  if dirExists(commandsDir):
-    var cmdCount = 0
-    for _ in walkDir(commandsDir):
-      cmdCount.inc
-    echo "[OK] commands/gsd/ exists (", cmdCount, " files)"
-  else:
-    issues.add("commands/gsd/ directory missing")
-
-  # Check agents/
-  let agentsDir = resolvedDir / "agents"
-  if dirExists(agentsDir):
-    var agentCount = 0
-    for _ in walkDir(agentsDir):
-      agentCount.inc
-    if agentCount > 0:
-      echo "[OK] agents/ exists (", agentCount, " files)"
+  # Platform-specific checks
+  case targetPlatform
+  of pClaudeCode:
+    # Check commands/gsd/
+    let commandsDir = resolvedDir / "commands" / "gsd"
+    if dirExists(commandsDir):
+      var cmdCount = 0
+      for _ in walkDir(commandsDir):
+        cmdCount.inc
+      echo "[OK] commands/gsd/ exists (", cmdCount, " files)"
     else:
-      warnings.add("agents/ directory is empty")
-  else:
-    warnings.add("agents/ directory missing")
+      issues.add("commands/gsd/ directory missing")
 
-  # Check settings.json
-  let settingsPath = resolvedDir / "settings.json"
-  if fileExists(settingsPath):
-    echo "[OK] settings.json exists"
-
-    try:
-      let settings = parseJson(readFile(settingsPath))
-
-      # Check hooks (new object format: hooks.SessionStart[].hooks[].command)
-      if settings.hasKey("hooks"):
-        var hasGsdHook = false
-        if settings["hooks"].kind == JObject:
-          for eventName, eventHooks in settings["hooks"].pairs:
-            if eventHooks.kind == JArray:
-              for hookEntry in eventHooks:
-                if hookEntry.hasKey("hooks") and hookEntry["hooks"].kind == JArray:
-                  for h in hookEntry["hooks"]:
-                    let cmd = h.getOrDefault("command").getStr("")
-                    if cmd.contains("gsd") or cmd.contains("#gsd"):
-                      hasGsdHook = true
-                      break
-        if hasGsdHook:
-          echo "[OK] GSD hooks configured"
-        else:
-          warnings.add("No GSD hooks found in settings.json")
+    # Check agents/
+    let agentsDir = resolvedDir / "agents"
+    if dirExists(agentsDir):
+      var agentCount = 0
+      for _ in walkDir(agentsDir):
+        agentCount.inc
+      if agentCount > 0:
+        echo "[OK] agents/ exists (", agentCount, " files)"
       else:
-        warnings.add("No hooks object in settings.json")
+        warnings.add("agents/ directory is empty")
+    else:
+      warnings.add("agents/ directory missing")
 
-      # Check statusLine (camelCase is correct format)
-      let hasStatusLine = settings.hasKey("statusLine") or settings.hasKey("statusline")
-      if hasStatusLine:
-        let statusNode = if settings.hasKey("statusLine"): settings["statusLine"]
-                         else: settings["statusline"]
-        var cmd = ""
-        if statusNode.kind == JString:
-          cmd = statusNode.getStr("")
-        elif statusNode.kind == JObject and statusNode.hasKey("command"):
-          cmd = statusNode["command"].getStr("")
-        if cmd.contains("gsd"):
-          echo "[OK] GSD statusline configured"
+  of pCodexCli:
+    # Check prompts/
+    let promptsDir = resolvedDir / CodexPromptsDir
+    if dirExists(promptsDir):
+      var promptCount = 0
+      for kind, path in walkDir(promptsDir):
+        if kind == pcFile and extractFilename(path).startsWith("gsd-"):
+          promptCount.inc
+      echo "[OK] prompts/ exists (", promptCount, " GSD prompts)"
+    else:
+      issues.add("prompts/ directory missing")
+
+    # Check AGENTS.md
+    let agentsMdPath = resolvedDir / CodexAgentsMdFile
+    if fileExists(agentsMdPath):
+      echo "[OK] AGENTS.md exists"
+    else:
+      warnings.add("AGENTS.md missing")
+
+  # Platform-specific config file checks
+  case targetPlatform
+  of pClaudeCode:
+    # Check settings.json
+    let settingsPath = resolvedDir / "settings.json"
+    if fileExists(settingsPath):
+      echo "[OK] settings.json exists"
+
+      try:
+        let settings = parseJson(readFile(settingsPath))
+
+        # Check hooks (new object format: hooks.SessionStart[].hooks[].command)
+        if settings.hasKey("hooks"):
+          var hasGsdHook = false
+          if settings["hooks"].kind == JObject:
+            for eventName, eventHooks in settings["hooks"].pairs:
+              if eventHooks.kind == JArray:
+                for hookEntry in eventHooks:
+                  if hookEntry.hasKey("hooks") and hookEntry["hooks"].kind == JArray:
+                    for h in hookEntry["hooks"]:
+                      let cmd = h.getOrDefault("command").getStr("")
+                      if cmd.contains("gsd") or cmd.contains("#gsd"):
+                        hasGsdHook = true
+                        break
+          if hasGsdHook:
+            echo "[OK] GSD hooks configured"
+          else:
+            warnings.add("No GSD hooks found in settings.json")
         else:
-          warnings.add("Statusline not using GSD (custom statusline)")
-    except JsonParsingError:
-      issues.add("settings.json is corrupted")
-  else:
-    warnings.add("settings.json missing (will be created on first use)")
+          warnings.add("No hooks object in settings.json")
 
-  # Summary
-  echo ""
-  if issues.len == 0 and warnings.len == 0:
-    echo "Installation is healthy!"
-  else:
-    if issues.len > 0:
-      echo "Issues:"
-      for issue in issues:
-        echo "  - ", issue
-    if warnings.len > 0:
-      echo "Warnings:"
-      for warning in warnings:
-        echo "  - ", warning
+        # Check statusLine (camelCase is correct format)
+        let hasStatusLine = settings.hasKey("statusLine") or settings.hasKey("statusline")
+        if hasStatusLine:
+          let statusNode = if settings.hasKey("statusLine"): settings["statusLine"]
+                           else: settings["statusline"]
+          var cmd = ""
+          if statusNode.kind == JString:
+            cmd = statusNode.getStr("")
+          elif statusNode.kind == JObject and statusNode.hasKey("command"):
+            cmd = statusNode["command"].getStr("")
+          if cmd.contains("gsd"):
+            echo "[OK] GSD statusline configured"
+          else:
+            warnings.add("Statusline not using GSD (custom statusline)")
+      except JsonParsingError:
+        issues.add("settings.json is corrupted")
+    else:
+      warnings.add("settings.json missing (will be created on first use)")
 
-    if issues.len > 0:
+  of pCodexCli:
+    # Check config.toml
+    let configTomlPath = resolvedDir / CodexConfigFile
+    if fileExists(configTomlPath):
+      echo "[OK] config.toml exists"
+      # Check for GSD notify hooks in config.toml
+      let content = readFile(configTomlPath)
+      if content.contains("#gsd") or content.contains("gsd "):
+        echo "[OK] GSD hooks configured"
+      else:
+        warnings.add("No GSD hooks found in config.toml")
+    else:
+      warnings.add("config.toml missing (will be created on first use)")
+
+  return (issues, warnings)
+
+proc cmdDoctor(args: seq[string]) =
+  ## Validate installation health
+  var configDir = ""
+  var targetPlatform = pClaudeCode
+  var platformExplicit = false
+
+  var p = initOptParser(args)
+  while true:
+    p.next()
+    case p.kind
+    of cmdEnd: break
+    of cmdShortOption, cmdLongOption:
+      case p.key
+      of "c", "config-dir":
+        configDir = p.val
+      of "p", "platform":
+        try:
+          targetPlatform = parsePlatform(p.val)
+          platformExplicit = true
+        except ValueError as e:
+          stderr.writeLine "Error: ", e.msg
+          quit(1)
+      else:
+        discard
+    of cmdArgument:
+      discard
+
+  # If specific config-dir provided, check just that
+  if configDir.len > 0:
+    let resolvedDir = expandPath(configDir)
+    let cfg = loadConfig(resolvedDir)
+    if cfg.isSome:
+      targetPlatform = cfg.get().platform
+
+    echo "Checking GSD installation at ", resolvedDir, " (", $targetPlatform, ")..."
+    echo ""
+
+    let (issues, warnings) = runDoctorForPlatform(resolvedDir, targetPlatform)
+
+    echo ""
+    if issues.len == 0 and warnings.len == 0:
+      echo "Installation is healthy!"
+    else:
+      if issues.len > 0:
+        echo "Issues:"
+        for issue in issues:
+          echo "  - ", issue
+      if warnings.len > 0:
+        echo "Warnings:"
+        for warning in warnings:
+          echo "  - ", warning
+
+      if issues.len > 0:
+        echo ""
+        echo "Run 'gsd install' to fix issues."
+        quit(1)
+    return
+
+  # If specific platform provided, check just that
+  if platformExplicit:
+    let found = findConfigDir(targetPlatform)
+    if found.isNone:
+      echo "No GSD installation found for ", $targetPlatform, "."
       echo ""
-      echo "Run 'gsd install' to fix issues."
+      echo "Run 'gsd install --platform=", $targetPlatform, "' to install GSD."
       quit(1)
+
+    let resolvedDir = found.get()
+    echo "Checking GSD installation at ", resolvedDir, " (", $targetPlatform, ")..."
+    echo ""
+
+    let (issues, warnings) = runDoctorForPlatform(resolvedDir, targetPlatform)
+
+    echo ""
+    if issues.len == 0 and warnings.len == 0:
+      echo "Installation is healthy!"
+    else:
+      if issues.len > 0:
+        echo "Issues:"
+        for issue in issues:
+          echo "  - ", issue
+      if warnings.len > 0:
+        echo "Warnings:"
+        for warning in warnings:
+          echo "  - ", warning
+
+      if issues.len > 0:
+        echo ""
+        echo "Run 'gsd install' to fix issues."
+        quit(1)
+    return
+
+  # No specific platform/dir - check all installed platforms
+  let installed = findInstalledPlatforms()
+
+  if installed.len == 0:
+    echo "No GSD installation found."
+    echo ""
+    echo "Run 'gsd install' to install GSD."
+    quit(1)
+
+  var totalIssues = 0
+  var totalWarnings = 0
+
+  for i, plat in installed:
+    let found = findConfigDir(plat)
+    if found.isNone:
+      continue
+
+    let resolvedDir = found.get()
+
+    if i > 0:
+      echo ""
+      echo "---"
+      echo ""
+
+    echo "Checking GSD installation at ", resolvedDir, " (", $plat, ")..."
+    echo ""
+
+    let (issues, warnings) = runDoctorForPlatform(resolvedDir, plat)
+
+    echo ""
+    if issues.len == 0 and warnings.len == 0:
+      echo "Installation is healthy!"
+    else:
+      if issues.len > 0:
+        echo "Issues:"
+        for issue in issues:
+          echo "  - ", issue
+      if warnings.len > 0:
+        echo "Warnings:"
+        for warning in warnings:
+          echo "  - ", warning
+
+    totalIssues += issues.len
+    totalWarnings += warnings.len
+
+  # Summary for multiple platforms
+  if installed.len > 1:
+    echo ""
+    echo "==="
+    echo ""
+    if totalIssues == 0 and totalWarnings == 0:
+      echo "All ", installed.len, " installations are healthy!"
+    else:
+      echo "Summary: ", totalIssues, " issue(s), ", totalWarnings, " warning(s) across ", installed.len, " installation(s)"
+
+  if totalIssues > 0:
+    echo ""
+    echo "Run 'gsd install' to fix issues."
+    quit(1)
 
 proc cmdCheckUpdate(args: seq[string]) =
   var silent = true
@@ -353,6 +689,97 @@ proc cmdStatusline(args: seq[string]) =
 
   runStatusline(configDir)
 
+proc cmdUpdate(args: seq[string]) =
+  ## Update GSD for all installed platforms
+  var verbose = false
+  var platformChoice: Option[PlatformChoice] = none(PlatformChoice)
+
+  var p = initOptParser(args)
+  while true:
+    p.next()
+    case p.kind
+    of cmdEnd: break
+    of cmdShortOption, cmdLongOption:
+      case p.key
+      of "p", "platform":
+        try:
+          platformChoice = some(parsePlatformChoice(p.val))
+        except ValueError as e:
+          stderr.writeLine "Error: ", e.msg
+          quit(1)
+      of "verbose":
+        verbose = true
+      of "h", "help":
+        echo "Usage: gsd update [options]"
+        echo ""
+        echo "Re-installs GSD for all installed platforms (or specified platform)."
+        echo ""
+        echo "Options:"
+        echo "  -p, --platform <name>     Target: claude, codex, or both"
+        echo "  --verbose                 Verbose output"
+        quit(0)
+      else:
+        discard
+    of cmdArgument:
+      discard
+
+  let sourceDir = findSourceDir()
+
+  # Verify source directory has required content
+  if not dirExists(sourceDir / "gsd") or not dirExists(sourceDir / "commands"):
+    stderr.writeLine "Error: Cannot find GSD source files."
+    stderr.writeLine "Make sure you're running the update from the GSD directory,"
+    stderr.writeLine "or that the binary is located alongside the gsd/ and commands/ directories."
+    quit(1)
+
+  # Determine which platforms to update
+  var platforms: seq[Platform]
+  if platformChoice.isSome:
+    platforms = platformChoiceToSeq(platformChoice.get())
+  else:
+    # Update all installed platforms
+    platforms = findInstalledPlatforms()
+    if platforms.len == 0:
+      echo "No GSD installation found. Run 'gsd install' first."
+      quit(1)
+
+  var allSuccess = true
+
+  for targetPlatform in platforms:
+    let found = findConfigDir(targetPlatform)
+    if found.isNone:
+      if platformChoice.isSome:
+        stderr.writeLine "Error: No GSD installation found for ", $targetPlatform, "."
+        allSuccess = false
+      continue
+
+    # Create install options based on existing installation
+    let cfg = loadConfig(found.get())
+    var opts = InstallOptions(
+      installType: if cfg.isSome: cfg.get().installType else: itGlobal,
+      platform: targetPlatform,
+      forceStatusline: false,
+      verbose: verbose
+    )
+
+    # If it was a custom install, preserve the path
+    if opts.installType == itCustom and cfg.isSome:
+      opts.configDir = cfg.get().configDir
+
+    let result = install(sourceDir, opts)
+
+    if result.success:
+      clearUpdateCache(found.get())
+    else:
+      stderr.writeLine "Error updating ", $targetPlatform, ": ", result.message
+      allSuccess = false
+
+  if allSuccess:
+    echo ""
+    echo "Update complete!"
+  else:
+    quit(1)
+
 proc main() =
   let args = commandLineParams()
 
@@ -367,6 +794,8 @@ proc main() =
     cmdInstall(restArgs)
   of "uninstall":
     cmdUninstall(restArgs)
+  of "update":
+    cmdUpdate(restArgs)
   of "doctor":
     cmdDoctor(restArgs)
   of "check-update":

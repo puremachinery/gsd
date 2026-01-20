@@ -2,7 +2,7 @@
 ## Checks GitHub API for new releases and caches result
 
 import std/[httpclient, json, os, options, strutils, times]
-import config
+import config, platform
 
 const
   GitHubApiUrl = "https://api.github.com/repos/puremachinery/gsd/releases/latest"
@@ -245,30 +245,103 @@ proc runCheckUpdate*(silent: bool = true, configDir: string = "") =
   ## Run update check (called from hook)
   ## Silent mode: just update cache, no output
   ## Non-silent: print result
+  ## If configDir is empty, checks all installed platforms
 
-  let result = checkForUpdate(configDir, forceCheck = false)
+  if configDir.len > 0:
+    # Check specific config dir
+    let result = checkForUpdate(configDir, forceCheck = false)
 
-  if not silent and result.isSome:
-    let r = result.get()
-    if r.updateAvailable:
-      echo "GSD update available: ", r.currentVersion, " -> ", r.latestVersion
-      echo "Run /gsd:update or visit: ", r.releaseUrl
-    else:
-      echo "GSD is up to date (", r.currentVersion, ")"
+    if not silent and result.isSome:
+      let r = result.get()
+      if r.updateAvailable:
+        echo "GSD update available: ", r.currentVersion, " -> ", r.latestVersion
+        echo "Run 'gsd update' or visit: ", r.releaseUrl
+      else:
+        echo "GSD is up to date (", r.currentVersion, ")"
+  else:
+    # Check all installed platforms
+    let installed = findInstalledPlatforms()
+
+    if installed.len == 0:
+      if not silent:
+        echo "No GSD installation found."
+      return
+
+    var anyUpdateAvailable = false
+    var latestVersion = ""
+    var releaseUrl = ""
+    var currentVersion = ""
+
+    for plat in installed:
+      let found = findConfigDir(plat)
+      if found.isNone:
+        continue
+
+      let result = checkForUpdate(found.get(), forceCheck = false)
+
+      if result.isSome:
+        let r = result.get()
+        if r.updateAvailable:
+          anyUpdateAvailable = true
+          latestVersion = r.latestVersion
+          releaseUrl = r.releaseUrl
+        currentVersion = r.currentVersion
+
+    if not silent:
+      if anyUpdateAvailable:
+        echo "GSD update available: ", currentVersion, " -> ", latestVersion
+        echo "Run 'gsd update' or visit: ", releaseUrl
+      elif currentVersion.len > 0:
+        echo "GSD is up to date (", currentVersion, ")"
+
+proc runUpdateAll*(sourceDir: string, verbose: bool = false): bool =
+  ## Update all installed platforms
+  ## Returns true if all updates succeeded
+  let installed = findInstalledPlatforms()
+
+  if installed.len == 0:
+    echo "No GSD installation found."
+    return false
+
+  var allSuccess = true
+
+  # Import install module dynamically to avoid circular deps
+  # We'll call install() for each platform
+  for plat in installed:
+    let found = findConfigDir(plat)
+    if found.isNone:
+      continue
+
+    echo "Updating ", $plat, "..."
+
+    # Clear cache for this platform
+    let cachePath = found.get() / CacheDirName / CacheFileName
+    if fileExists(cachePath):
+      try:
+        removeFile(cachePath)
+      except OSError:
+        discard
+
+  return allSuccess
 
 proc clearUpdateCache*(configDir: string = "") =
   ## Clear the update cache (called after update)
-  let locations = if configDir.len > 0:
-    @[expandPath(configDir) / CacheDirName / CacheFileName]
-  else:
-    @[
-      getLocalConfigDir() / CacheDirName / CacheFileName,
-      getGlobalConfigDir() / CacheDirName / CacheFileName
-    ]
-
-  for path in locations:
+  if configDir.len > 0:
+    let path = expandPath(configDir) / CacheDirName / CacheFileName
     if fileExists(path):
       try:
         removeFile(path)
       except OSError:
         discard
+  else:
+    # Clear cache for all installed platforms
+    let installed = findInstalledPlatforms()
+    for plat in installed:
+      let found = findConfigDir(plat)
+      if found.isSome:
+        let path = found.get() / CacheDirName / CacheFileName
+        if fileExists(path):
+          try:
+            removeFile(path)
+          except OSError:
+            discard
