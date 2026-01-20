@@ -35,7 +35,7 @@ proc promptPlatformChoice(): PlatformChoice =
     echo "Invalid choice. Defaulting to Claude Code."
     return pcClaude
 
-proc promptUninstallChoice(installed: seq[Platform]): seq[Platform] =
+proc promptUninstallChoice(installed: seq[InstalledConfig]): seq[InstalledConfig] =
   ## Prompt user to select platform(s) for uninstallation
   if installed.len == 0:
     return @[]
@@ -46,9 +46,8 @@ proc promptUninstallChoice(installed: seq[Platform]): seq[Platform] =
   echo ""
   echo "GSD is installed for multiple platforms. Select which to uninstall:"
   var idx = 1
-  for p in installed:
-    let dir = platform.getGlobalConfigDir(p)
-    echo "  ", idx, ") ", $p, " (", dir, ")"
+  for install in installed:
+    echo "  ", idx, ") ", $install.platform, " (", install.dir, ")"
     idx.inc
   echo "  ", idx, ") All"
   echo ""
@@ -287,39 +286,46 @@ proc cmdUninstall(args: seq[string]) =
 
   # Handle --all flag
   if uninstallAll:
-    let installed = findInstalledPlatforms()
+    let installed = listInstalledConfigs()
     if installed.len == 0:
       stderr.writeLine "Error: No GSD installation found."
       quit(1)
 
-    for plat in installed:
-      let found = findConfigDir(plat)
-      if found.isSome:
-        discard uninstall(found.get(), verbose, plat)
+    for install in installed:
+      discard uninstall(install.dir, verbose, install.platform)
     return
 
   # Handle explicit platform choice (may include "both")
   if platformExplicit:
     let platforms = platformChoiceToSeq(platformChoice)
+    let installed = listInstalledConfigs()
+    var targets: seq[InstalledConfig] = @[]
 
-    for plat in platforms:
-      var targetDir: string
-      if useGlobal:
-        targetDir = platform.getGlobalConfigDir(plat)
-      elif useLocal:
-        targetDir = platform.getLocalConfigDir(plat)
-      else:
-        let found = findConfigDir(plat)
-        if found.isNone:
+    if useGlobal or useLocal:
+      for plat in platforms:
+        let targetDir = if useGlobal:
+          platform.getGlobalConfigDir(plat)
+        else:
+          platform.getLocalConfigDir(plat)
+
+        if fileExists(targetDir / ConfigFileName):
+          targets.add(InstalledConfig(platform: plat, dir: targetDir))
+        else:
           stderr.writeLine "Error: No GSD installation found for ", $plat, "."
-          continue
-        targetDir = found.get()
+    else:
+      for install in installed:
+        if install.platform in platforms:
+          targets.add(install)
 
-      discard uninstall(targetDir, verbose, plat)
+    if targets.len == 0:
+      quit(1)
+
+    for target in targets:
+      discard uninstall(target.dir, verbose, target.platform)
     return
 
   # No explicit options - check what's installed
-  let installed = findInstalledPlatforms()
+  let installed = listInstalledConfigs()
 
   if installed.len == 0:
     stderr.writeLine "Error: No GSD installation found."
@@ -327,19 +333,15 @@ proc cmdUninstall(args: seq[string]) =
 
   # If only one platform installed, uninstall it
   if installed.len == 1:
-    let plat = installed[0]
-    let found = findConfigDir(plat)
-    if found.isSome:
-      discard uninstall(found.get(), verbose, plat)
+    let install = installed[0]
+    discard uninstall(install.dir, verbose, install.platform)
     return
 
   # Multiple platforms installed - prompt if interactive
   if isInteractive():
     let toUninstall = promptUninstallChoice(installed)
-    for plat in toUninstall:
-      let found = findConfigDir(plat)
-      if found.isSome:
-        discard uninstall(found.get(), verbose, plat)
+    for install in toUninstall:
+      discard uninstall(install.dir, verbose, install.platform)
   else:
     # Non-interactive with multiple platforms - require explicit choice
     stderr.writeLine "Error: Multiple GSD installations found. Specify --platform or --all."
@@ -556,40 +558,65 @@ proc cmdDoctor(args: seq[string]) =
 
   # If specific platform provided, check just that
   if platformExplicit:
-    let found = findConfigDir(targetPlatform)
-    if found.isNone:
+    let installed = listInstalledConfigs()
+    var targets: seq[InstalledConfig] = @[]
+    for install in installed:
+      if install.platform == targetPlatform:
+        targets.add(install)
+
+    if targets.len == 0:
       echo "No GSD installation found for ", $targetPlatform, "."
       echo ""
       echo "Run 'gsd install --platform=", $targetPlatform, "' to install GSD."
       quit(1)
 
-    let resolvedDir = found.get()
-    echo "Checking GSD installation at ", resolvedDir, " (", $targetPlatform, ")..."
-    echo ""
+    var totalIssues = 0
+    var totalWarnings = 0
 
-    let (issues, warnings) = runDoctorForPlatform(resolvedDir, targetPlatform)
-
-    echo ""
-    if issues.len == 0 and warnings.len == 0:
-      echo "Installation is healthy!"
-    else:
-      if issues.len > 0:
-        echo "Issues:"
-        for issue in issues:
-          echo "  - ", issue
-      if warnings.len > 0:
-        echo "Warnings:"
-        for warning in warnings:
-          echo "  - ", warning
-
-      if issues.len > 0:
+    for i, install in targets:
+      if i > 0:
         echo ""
-        echo "Run 'gsd install' to fix issues."
-        quit(1)
+        echo "---"
+        echo ""
+
+      echo "Checking GSD installation at ", install.dir, " (", $install.platform, ")..."
+      echo ""
+
+      let (issues, warnings) = runDoctorForPlatform(install.dir, install.platform)
+
+      echo ""
+      if issues.len == 0 and warnings.len == 0:
+        echo "Installation is healthy!"
+      else:
+        if issues.len > 0:
+          echo "Issues:"
+          for issue in issues:
+            echo "  - ", issue
+        if warnings.len > 0:
+          echo "Warnings:"
+          for warning in warnings:
+            echo "  - ", warning
+
+      totalIssues += issues.len
+      totalWarnings += warnings.len
+
+    if targets.len > 1:
+      echo ""
+      echo "==="
+      echo ""
+      if totalIssues == 0 and totalWarnings == 0:
+        echo "All ", targets.len, " installations are healthy!"
+      else:
+        echo "Summary: ", totalIssues, " issue(s), ", totalWarnings, " warning(s) across ", targets.len, " installation(s)"
+
+    if totalIssues > 0:
+      echo ""
+      echo "Run 'gsd install' to fix issues."
+      quit(1)
     return
 
   # No specific platform/dir - check all installed platforms
-  let installed = findInstalledPlatforms()
+  let installed = listInstalledConfigs()
 
   if installed.len == 0:
     echo "No GSD installation found."
@@ -600,22 +627,16 @@ proc cmdDoctor(args: seq[string]) =
   var totalIssues = 0
   var totalWarnings = 0
 
-  for i, plat in installed:
-    let found = findConfigDir(plat)
-    if found.isNone:
-      continue
-
-    let resolvedDir = found.get()
-
+  for i, install in installed:
     if i > 0:
       echo ""
       echo "---"
       echo ""
 
-    echo "Checking GSD installation at ", resolvedDir, " (", $plat, ")..."
+    echo "Checking GSD installation at ", install.dir, " (", $install.platform, ")..."
     echo ""
 
-    let (issues, warnings) = runDoctorForPlatform(resolvedDir, plat)
+    let (issues, warnings) = runDoctorForPlatform(install.dir, install.platform)
 
     echo ""
     if issues.len == 0 and warnings.len == 0:
@@ -733,46 +754,60 @@ proc cmdUpdate(args: seq[string]) =
     quit(1)
 
   # Determine which platforms to update
-  var platforms: seq[Platform]
+  let installed = listInstalledConfigs()
+  if installed.len == 0:
+    echo "No GSD installation found. Run 'gsd install' first."
+    quit(1)
+
+  var targets: seq[InstalledConfig] = @[]
+  var platforms: seq[Platform] = @[]
+  var missingPlatform = false
   if platformChoice.isSome:
     platforms = platformChoiceToSeq(platformChoice.get())
+    for install in installed:
+      if install.platform in platforms:
+        targets.add(install)
+
+    for plat in platforms:
+      var found = false
+      for install in targets:
+        if install.platform == plat:
+          found = true
+          break
+      if not found:
+        stderr.writeLine "Error: No GSD installation found for ", $plat, "."
+        missingPlatform = true
   else:
-    # Update all installed platforms
-    platforms = findInstalledPlatforms()
-    if platforms.len == 0:
-      echo "No GSD installation found. Run 'gsd install' first."
-      quit(1)
+    targets = installed
 
   var allSuccess = true
 
-  for targetPlatform in platforms:
-    let found = findConfigDir(targetPlatform)
-    if found.isNone:
-      if platformChoice.isSome:
-        stderr.writeLine "Error: No GSD installation found for ", $targetPlatform, "."
-        allSuccess = false
-      continue
-
-    # Create install options based on existing installation
-    let cfg = loadConfig(found.get())
+  for target in targets:
+    let cfg = loadConfig(target.dir)
     var opts = InstallOptions(
-      installType: if cfg.isSome: cfg.get().installType else: itGlobal,
-      platform: targetPlatform,
+      installType: if cfg.isSome: cfg.get().installType else: inferInstallType(target.dir, target.platform),
+      platform: target.platform,
       forceStatusline: false,
       verbose: verbose
     )
 
     # If it was a custom install, preserve the path
-    if opts.installType == itCustom and cfg.isSome:
-      opts.configDir = cfg.get().configDir
+    if opts.installType == itCustom:
+      if cfg.isSome and cfg.get().configDir.len > 0:
+        opts.configDir = cfg.get().configDir
+      else:
+        opts.configDir = target.dir
 
     let result = install(sourceDir, opts)
 
     if result.success:
-      clearUpdateCache(found.get())
+      clearUpdateCache(target.dir)
     else:
-      stderr.writeLine "Error updating ", $targetPlatform, ": ", result.message
+      stderr.writeLine "Error updating ", $target.platform, ": ", result.message
       allSuccess = false
+
+  if missingPlatform:
+    allSuccess = false
 
   if allSuccess:
     echo ""

@@ -17,6 +17,12 @@ type
     configDir*: string
     installedAt*: string
 
+  InstalledConfig* = object
+    platform*: Platform
+    dir*: string
+
+proc loadConfig*(configDir: string): Option[GsdConfig]
+
 const
   Version* = "0.2.0"
   ConfigFileName* = "gsd-config.json"
@@ -60,6 +66,15 @@ proc getEnvConfigDir(): Option[string] =
   if dirExists(expanded):
     return some(expanded)
   return none(string)
+
+proc inferInstallType*(dir: string, p: Platform): InstallType =
+  ## Infer install type from a config directory path
+  let expanded = expandPath(dir)
+  if expanded == platform.getLocalConfigDir(p):
+    return itLocal
+  if expanded == platform.getGlobalConfigDir(p):
+    return itGlobal
+  return itCustom
 
 proc getLocalConfigDir*(): string =
   ## Returns ./.claude (Claude Code default)
@@ -140,7 +155,9 @@ proc findConfigDir*(p: Platform, explicit: string = ""): Option[string] =
   # Environment variable override
   let envDir = getEnvConfigDir()
   if envDir.isSome:
-    return envDir
+    let cfg = loadConfig(envDir.get())
+    if cfg.isSome and cfg.get().platform == p:
+      return envDir
 
   # Check local first
   let localDir = platform.getLocalConfigDir(p)
@@ -155,6 +172,27 @@ proc findConfigDir*(p: Platform, explicit: string = ""): Option[string] =
     return some(globalDir)
 
   return none(string)
+
+proc addInstalledConfig(installs: var seq[InstalledConfig], p: Platform, dir: string) =
+  for item in installs:
+    if item.dir == dir:
+      return
+  installs.add(InstalledConfig(platform: p, dir: dir))
+
+proc listInstalledConfigs*(): seq[InstalledConfig] =
+  ## List all detected installations (local/global + env var if valid)
+  result = @[]
+
+  for p in [pClaudeCode, pCodexCli]:
+    for dir in [platform.getLocalConfigDir(p), platform.getGlobalConfigDir(p)]:
+      if fileExists(dir / ConfigFileName):
+        addInstalledConfig(result, p, dir)
+
+  let envDir = getEnvConfigDir()
+  if envDir.isSome:
+    let cfg = loadConfig(envDir.get())
+    if cfg.isSome:
+      addInstalledConfig(result, cfg.get().platform, envDir.get())
 
 proc findVersionFile*(explicit: string = ""): Option[string] =
   ## Find VERSION file, checking local then global

@@ -37,6 +37,7 @@ Entry point: `installer/src/gsd.nim`
 
 Commands:
 - `install` / `uninstall`
+- `update`
 - `doctor`
 - `statusline` (hook)
 - `check-update` (hook)
@@ -61,7 +62,7 @@ Resolution order:
 
 ```json
 {
-  "version": "2.0.0",
+  "version": "0.2.0",
   "install_type": "global",
   "config_dir": "/Users/name/.claude",
   "installed_at": "2026-01-17T10:30:00Z"
