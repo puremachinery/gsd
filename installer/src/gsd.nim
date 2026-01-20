@@ -5,7 +5,7 @@ import std/[os, strutils, parseopt, options, json]
 import config, install, statusline, update
 
 const
-HelpText = """
+  HelpText = """
 GSD - Get Stuff Done
 A meta-prompting system for Claude Code (Codex CLI planned)
 
