@@ -2,6 +2,13 @@
 
 import std/[unittest, os, strutils, options, envvars]
 import ../src/config
+import ../src/platform
+
+proc hasInstall(installs: seq[InstalledConfig], p: Platform, dir: string): bool =
+  for item in installs:
+    if item.platform == p and item.dir == dir:
+      return true
+  return false
 
 suite "expandPath":
   test "tilde alone expands to home directory":
@@ -172,3 +179,107 @@ suite "findConfigDir resolution":
     let found = findConfigDir()
     check found.isSome
     check found.get() == codexDir
+
+  test "findConfigDir(platform) ignores env dir if platform mismatches":
+    let originalDir = getCurrentDir()
+    let tempHome = getTempDir() / "gsd_test_env_platform_home"
+    let tempWork = getTempDir() / "gsd_test_env_platform_work"
+    createDir(tempHome)
+    createDir(tempWork)
+    defer:
+      setCurrentDir(originalDir)
+      removeDir(tempHome)
+      removeDir(tempWork)
+
+    let oldHome = getEnv("HOME")
+    putEnv("HOME", tempHome)
+    defer:
+      if oldHome.len > 0:
+        putEnv("HOME", oldHome)
+      else:
+        delEnv("HOME")
+
+    let oldEnv = getEnv(ConfigEnvVar)
+    defer:
+      if oldEnv.len > 0:
+        putEnv(ConfigEnvVar, oldEnv)
+      else:
+        delEnv(ConfigEnvVar)
+
+    setCurrentDir(tempWork)
+
+    let envDir = tempHome / ".envcodex"
+    createDir(envDir)
+    writeFile(envDir / ConfigFileName, """{"platform":"codex"}""")
+    putEnv(ConfigEnvVar, envDir)
+
+    let found = findConfigDir(pClaudeCode)
+    check found.isNone
+
+suite "install enumeration":
+  test "inferInstallType identifies local/global/custom":
+    let originalDir = getCurrentDir()
+    let tempHome = getTempDir() / "gsd_test_infer_home"
+    let tempWork = getTempDir() / "gsd_test_infer_work"
+    createDir(tempHome)
+    createDir(tempWork)
+    defer:
+      setCurrentDir(originalDir)
+      removeDir(tempHome)
+      removeDir(tempWork)
+
+    let oldHome = getEnv("HOME")
+    putEnv("HOME", tempHome)
+    defer:
+      if oldHome.len > 0:
+        putEnv("HOME", oldHome)
+      else:
+        delEnv("HOME")
+
+    setCurrentDir(tempWork)
+
+    check inferInstallType(platform.getLocalConfigDir(pClaudeCode), pClaudeCode) == itLocal
+    check inferInstallType(platform.getGlobalConfigDir(pClaudeCode), pClaudeCode) == itGlobal
+    check inferInstallType(tempHome / "custom", pClaudeCode) == itCustom
+
+  test "listInstalledConfigs returns local and global installs":
+    let originalDir = getCurrentDir()
+    let tempHome = getTempDir() / "gsd_test_list_home"
+    let tempWork = getTempDir() / "gsd_test_list_work"
+    createDir(tempHome)
+    createDir(tempWork)
+    defer:
+      setCurrentDir(originalDir)
+      removeDir(tempHome)
+      removeDir(tempWork)
+
+    let oldHome = getEnv("HOME")
+    putEnv("HOME", tempHome)
+    defer:
+      if oldHome.len > 0:
+        putEnv("HOME", oldHome)
+      else:
+        delEnv("HOME")
+
+    let oldEnv = getEnv(ConfigEnvVar)
+    if oldEnv.len > 0:
+      delEnv(ConfigEnvVar)
+    defer:
+      if oldEnv.len > 0:
+        putEnv(ConfigEnvVar, oldEnv)
+      else:
+        delEnv(ConfigEnvVar)
+
+    setCurrentDir(tempWork)
+
+    let claudeLocal = platform.getLocalConfigDir(pClaudeCode)
+    let codexGlobal = platform.getGlobalConfigDir(pCodexCli)
+
+    createDir(claudeLocal)
+    writeFile(claudeLocal / ConfigFileName, """{"platform":"claude"}""")
+    createDir(codexGlobal)
+    writeFile(codexGlobal / ConfigFileName, """{"platform":"codex"}""")
+
+    let installs = listInstalledConfigs()
+    check hasInstall(installs, pClaudeCode, claudeLocal)
+    check hasInstall(installs, pCodexCli, codexGlobal)

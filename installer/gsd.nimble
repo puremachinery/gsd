@@ -17,3 +17,4 @@ task test, "Run tests":
   exec "nim c -r tests/test_install.nim"
   exec "nim c -r tests/test_statusline.nim"
   exec "nim c -r tests/test_update.nim"
+  exec "nim c -r tests/test_cli_integration.nim"
