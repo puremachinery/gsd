@@ -14,6 +14,7 @@ CLAUDE.md
 
 # Nim build artifacts
 installer/gsd
+installer/src/gsd
 installer/tests/test_config
 installer/tests/test_install
 installer/tests/test_statusline
