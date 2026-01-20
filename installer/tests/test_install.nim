@@ -2,6 +2,8 @@
 
 import std/[unittest, json, options, strutils, os]
 import ../src/install
+import ../src/platform
+import ../src/config
 
 suite "isOldGsdStatusline":
   test "detects node statusline.js pattern":
@@ -281,3 +283,271 @@ See ~/.claude/ for config
 
     check result.contains("@/usr/local/bin/something")
     check result.contains("~/other/path")  # Only ~/.claude/ is rewritten
+
+suite "rewritePathReferences with Codex platform":
+  test "global Codex install uses ~/.codex paths":
+    let content = "@~/.claude/gsd/workflows/execute.md"
+    let result = rewritePathReferences(content, "global", "", pCodexCli)
+
+    check result == "@~/.codex/gsd/workflows/execute.md"
+
+  test "local Codex install uses .codex paths":
+    let content = "@~/.claude/gsd/workflows/execute.md"
+    let result = rewritePathReferences(content, "local", "", pCodexCli)
+
+    check result == "@.codex/gsd/workflows/execute.md"
+
+  test "Codex rewrites non-@ references":
+    let content = "See ~/.claude/gsd/templates/ for more info"
+    let result = rewritePathReferences(content, "global", "", pCodexCli)
+
+    check result == "See ~/.codex/gsd/templates/ for more info"
+
+  test "custom Codex install uses custom path":
+    let content = "@~/.claude/gsd/workflows/execute.md"
+    let result = rewritePathReferences(content, "custom", "/opt/codex", pCodexCli)
+
+    check result == "@/opt/codex/gsd/workflows/execute.md"
+
+suite "generateAgentsMd":
+  test "generates AGENTS.md from agent files":
+    let tempDir = getTempDir() / "gsd_test_agents"
+    createDir(tempDir)
+    defer: removeDir(tempDir)
+
+    # Create test agent files
+    let agent1Path = tempDir / "gsd-agent1.md"
+    let agent2Path = tempDir / "gsd-agent2.md"
+
+    writeFile(agent1Path, """# Agent 1
+This agent does task 1.
+Path: @~/.claude/gsd/ref.md
+""")
+    writeFile(agent2Path, """# Agent 2
+This agent does task 2.
+""")
+
+    let destPath = tempDir / "AGENTS.md"
+    let success = generateAgentsMd(@[agent1Path, agent2Path], destPath, "global", "", pCodexCli)
+
+    check success == true
+    check fileExists(destPath)
+
+    let content = readFile(destPath)
+    check content.contains("# GSD Agents")
+    check content.contains("auto-generated")
+    check content.contains("## gsd-agent1")
+    check content.contains("## gsd-agent2")
+    check content.contains("This agent does task 1")
+    check content.contains("This agent does task 2")
+    # Check path rewriting for Codex
+    check content.contains("@~/.codex/gsd/ref.md")
+    check not content.contains("@~/.claude/")
+
+  test "sorts agent files for consistent order":
+    let tempDir = getTempDir() / "gsd_test_agents_sort"
+    createDir(tempDir)
+    defer: removeDir(tempDir)
+
+    let agentZ = tempDir / "gsd-zebra.md"
+    let agentA = tempDir / "gsd-alpha.md"
+
+    writeFile(agentZ, "# Zebra agent")
+    writeFile(agentA, "# Alpha agent")
+
+    let destPath = tempDir / "AGENTS.md"
+    # Pass in reverse order
+    discard generateAgentsMd(@[agentZ, agentA], destPath, "global", "", pCodexCli)
+
+    let content = readFile(destPath)
+    let alphaPos = content.find("gsd-alpha")
+    let zebraPos = content.find("gsd-zebra")
+
+    # Alpha should come before Zebra due to sorting
+    check alphaPos < zebraPos
+
+  test "handles empty agent list":
+    let tempDir = getTempDir() / "gsd_test_agents_empty"
+    createDir(tempDir)
+    defer: removeDir(tempDir)
+
+    let destPath = tempDir / "AGENTS.md"
+    let success = generateAgentsMd(@[], destPath, "global", "", pCodexCli)
+
+    check success == true
+    check fileExists(destPath)
+
+    let content = readFile(destPath)
+    check content.contains("# GSD Agents")
+
+suite "Codex install integration":
+  test "full Codex install creates expected structure":
+    let tempDir = getTempDir() / "gsd_test_codex_install"
+    let sourceDir = getTempDir() / "gsd_test_codex_source"
+
+    # Create source structure
+    createDir(sourceDir / "gsd" / "templates")
+    createDir(sourceDir / "gsd" / "workflows")
+    createDir(sourceDir / "commands" / "gsd")
+    createDir(sourceDir / "agents")
+
+    writeFile(sourceDir / "gsd" / "templates" / "plan.md", "# Plan template\nPath: @~/.claude/gsd/")
+    writeFile(sourceDir / "gsd" / "workflows" / "exec.md", "# Workflow")
+    writeFile(sourceDir / "commands" / "gsd" / "help.md", "# Help command\nSee ~/.claude/gsd/")
+    writeFile(sourceDir / "commands" / "gsd" / "new-project.md", "# New project")
+    writeFile(sourceDir / "agents" / "gsd-planner.md", "# Planner agent")
+    writeFile(sourceDir / "agents" / "gsd-executor.md", "# Executor agent")
+
+    defer:
+      removeDir(tempDir)
+      removeDir(sourceDir)
+
+    let opts = InstallOptions(
+      configDir: tempDir,
+      installType: itCustom,
+      platform: pCodexCli,
+      forceStatusline: false,
+      verbose: false
+    )
+
+    let result = install(sourceDir, opts)
+
+    check result.success == true
+    check result.configDir == tempDir
+
+    # Check gsd/ resources copied
+    check dirExists(tempDir / "gsd")
+    check dirExists(tempDir / "gsd" / "templates")
+    check fileExists(tempDir / "gsd" / "templates" / "plan.md")
+
+    # Check path rewriting in gsd resources
+    let planContent = readFile(tempDir / "gsd" / "templates" / "plan.md")
+    check planContent.contains("@" & tempDir & "/gsd/")
+    check not planContent.contains("@~/.claude/")
+
+    # Check prompts/ directory (Codex-specific)
+    check dirExists(tempDir / "prompts")
+    check fileExists(tempDir / "prompts" / "gsd-help.md")
+    check fileExists(tempDir / "prompts" / "gsd-new-project.md")
+
+    # Check prompt content has rewritten paths
+    let helpContent = readFile(tempDir / "prompts" / "gsd-help.md")
+    check helpContent.contains(tempDir & "/gsd/")
+    check not helpContent.contains("~/.claude/")
+
+    # Check AGENTS.md generated (Codex-specific)
+    check fileExists(tempDir / "AGENTS.md")
+    let agentsContent = readFile(tempDir / "AGENTS.md")
+    check agentsContent.contains("gsd-planner")
+    check agentsContent.contains("gsd-executor")
+
+    # Check config.toml created with hooks
+    check fileExists(tempDir / "config.toml")
+    let tomlContent = readFile(tempDir / "config.toml")
+    check tomlContent.contains("[[notify]]")
+    check tomlContent.contains("#gsd")
+
+    # Check gsd-config.json
+    check fileExists(tempDir / "gsd-config.json")
+    let cfg = loadConfig(tempDir)
+    check cfg.isSome
+    check cfg.get().platform == pCodexCli
+
+    # Check VERSION file
+    check fileExists(tempDir / "gsd" / "VERSION")
+
+    # Check cache directory
+    check dirExists(tempDir / "cache")
+
+  test "Codex uninstall removes GSD files but preserves user content":
+    let tempDir = getTempDir() / "gsd_test_codex_uninstall"
+    createDir(tempDir)
+    createDir(tempDir / "gsd")
+    createDir(tempDir / "prompts")
+    createDir(tempDir / "cache")
+
+    # GSD files
+    writeFile(tempDir / "gsd-config.json", """{"platform": "codex"}""")
+    writeFile(tempDir / "gsd" / "VERSION", "0.2.0")
+    writeFile(tempDir / "AGENTS.md", "# GSD Agents")
+    writeFile(tempDir / "prompts" / "gsd-help.md", "# GSD Help")
+    writeFile(tempDir / "prompts" / "gsd-new-project.md", "# GSD New Project")
+
+    # User files that should be preserved
+    writeFile(tempDir / "prompts" / "my-custom-prompt.md", "# My Custom Prompt")
+    writeFile(tempDir / "config.toml", """
+# User config
+model = "gpt-4"
+
+[[notify]]
+event = "session_start"
+command = "gsd check-update #gsd"
+
+[[notify]]
+event = "other"
+command = "my-custom-hook"
+""")
+
+    defer: removeDir(tempDir)
+
+    let success = uninstall(tempDir, false, pCodexCli)
+
+    check success == true
+
+    # GSD files should be removed
+    check not fileExists(tempDir / "gsd-config.json")
+    check not dirExists(tempDir / "gsd")
+    check not fileExists(tempDir / "AGENTS.md")
+    check not fileExists(tempDir / "prompts" / "gsd-help.md")
+    check not fileExists(tempDir / "prompts" / "gsd-new-project.md")
+
+    # User files should be preserved
+    check fileExists(tempDir / "prompts" / "my-custom-prompt.md")
+    check fileExists(tempDir / "config.toml")
+
+    # config.toml should have GSD hooks removed but user content preserved
+    let tomlContent = readFile(tempDir / "config.toml")
+    check tomlContent.contains("model = \"gpt-4\"")
+    check tomlContent.contains("my-custom-hook")
+    check not tomlContent.contains("#gsd")
+
+  test "Codex install then uninstall is clean":
+    let tempDir = getTempDir() / "gsd_test_codex_roundtrip"
+    let sourceDir = getTempDir() / "gsd_test_codex_roundtrip_src"
+
+    createDir(sourceDir / "gsd")
+    createDir(sourceDir / "commands" / "gsd")
+    createDir(sourceDir / "agents")
+
+    writeFile(sourceDir / "gsd" / "test.md", "# Test")
+    writeFile(sourceDir / "commands" / "gsd" / "help.md", "# Help")
+    writeFile(sourceDir / "agents" / "gsd-planner.md", "# Planner")
+
+    defer:
+      removeDir(tempDir)
+      removeDir(sourceDir)
+
+    # Install
+    let opts = InstallOptions(
+      configDir: tempDir,
+      installType: itCustom,
+      platform: pCodexCli,
+      forceStatusline: false,
+      verbose: false
+    )
+    let installResult = install(sourceDir, opts)
+    check installResult.success == true
+
+    # Uninstall
+    let uninstallResult = uninstall(tempDir, false, pCodexCli)
+    check uninstallResult == true
+
+    # Directory should be mostly empty (only cache might remain)
+    check not fileExists(tempDir / "gsd-config.json")
+    check not dirExists(tempDir / "gsd")
+    check not fileExists(tempDir / "AGENTS.md")
+
+    # prompts dir might remain if empty, but no gsd- files
+    if dirExists(tempDir / "prompts"):
+      for kind, path in walkDir(tempDir / "prompts"):
+        check not extractFilename(path).startsWith("gsd-")

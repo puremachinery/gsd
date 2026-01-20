@@ -6,7 +6,7 @@ GSD has two parts:
 1. **Prompt content** (markdown) - the workflows, templates, and references.
 2. **Installer + hooks** (native Nim binary) - installs content and integrates with host tools.
 
-GSD works with Claude Code today and is designed to extend to other tools that support subagents. Codex CLI integration is planned.
+GSD works with Claude Code today and supports Codex CLI. It is designed to extend to other tools that support subagents.
 
 ---
 
@@ -54,6 +54,8 @@ Resolution order:
 2. `GSD_CONFIG_DIR` env var
 3. Local `./.claude/gsd-config.json` (when running inside a project)
 4. Global `~/.claude/gsd-config.json`
+5. Local `./.codex/gsd-config.json`
+6. Global `~/.codex/gsd-config.json`
 
 `gsd-config.json` stores the resolved config root, install type, and version:
 
@@ -79,7 +81,7 @@ Principles:
 - Tag GSD-owned hooks with a stable marker (e.g., `#gsd`) so updates are safe.
 - If JSON is invalid, back it up and continue with a clean object.
 
-Claude Code settings use the `statusLine` key and a nested `hooks` object. Codex CLI uses its own configuration format; integration is planned.
+Claude Code settings use the `statusLine` key and a nested `hooks` object. Codex CLI uses `config.toml` with `[[notify]]` hooks; integration is supported via a text-preserving merge.
 
 ---
 
@@ -136,5 +138,4 @@ Model Name │ Building auth system │ project │ ██████░░░�
 ## Platform Notes
 
 - **Claude Code:** Uses `commands/gsd` for slash commands and `settings.json` hooks (`statusLine`, `hooks`).
-- **Codex CLI (planned):** Will use its own config root (via `--config-dir`, `$CODEX_HOME`, or default). The same prompt content applies, but integration files are tool-specific.
-
+- **Codex CLI:** Uses its own config root (via `--config-dir`, `$CODEX_HOME`, or default). The same prompt content applies, but integration files are tool-specific.

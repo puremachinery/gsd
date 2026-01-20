@@ -1,6 +1,6 @@
 ## Tests for config.nim
 
-import std/[unittest, os, strutils, options]
+import std/[unittest, os, strutils, options, envvars]
 import ../src/config
 
 suite "expandPath":
@@ -116,3 +116,59 @@ suite "config round-trip":
 
     let result = loadConfig(tempDir)
     check result.isNone
+
+suite "findConfigDir resolution":
+  test "uses GSD_CONFIG_DIR when set":
+    let tempDir = getTempDir() / "gsd_test_env"
+    createDir(tempDir)
+    defer: removeDir(tempDir)
+
+    let oldEnv = getEnv(ConfigEnvVar)
+    putEnv(ConfigEnvVar, tempDir)
+    defer:
+      if oldEnv.len > 0:
+        putEnv(ConfigEnvVar, oldEnv)
+      else:
+        delEnv(ConfigEnvVar)
+
+    let found = findConfigDir()
+    check found.isSome
+    check found.get() == tempDir
+
+  test "falls back to codex config when claude not present":
+    let originalDir = getCurrentDir()
+    let tempHome = getTempDir() / "gsd_test_home"
+    let tempWork = getTempDir() / "gsd_test_work"
+    createDir(tempHome)
+    createDir(tempWork)
+    defer:
+      setCurrentDir(originalDir)
+      removeDir(tempHome)
+      removeDir(tempWork)
+
+    let oldHome = getEnv("HOME")
+    putEnv("HOME", tempHome)
+    defer:
+      if oldHome.len > 0:
+        putEnv("HOME", oldHome)
+      else:
+        delEnv("HOME")
+
+    let oldEnv = getEnv(ConfigEnvVar)
+    if oldEnv.len > 0:
+      delEnv(ConfigEnvVar)
+    defer:
+      if oldEnv.len > 0:
+        putEnv(ConfigEnvVar, oldEnv)
+      else:
+        delEnv(ConfigEnvVar)
+
+    setCurrentDir(tempWork)
+
+    let codexDir = tempHome / ".codex"
+    createDir(codexDir)
+    writeFile(codexDir / ConfigFileName, "{}")
+
+    let found = findConfigDir()
+    check found.isSome
+    check found.get() == codexDir

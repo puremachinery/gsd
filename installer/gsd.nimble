@@ -1,7 +1,7 @@
 # Package
-version       = "0.1.0"
+version       = "0.2.0"
 author        = "Zera Alexander"
-description   = "GSD installer and hooks for Claude Code (Codex CLI planned)"
+description   = "GSD installer and hooks for Claude Code and Codex CLI"
 license       = "MIT"
 srcDir        = "src"
 bin           = @["gsd"]
@@ -11,6 +11,8 @@ requires "nim >= 2.0.0"
 
 # Tasks
 task test, "Run tests":
+  exec "nim c -r tests/test_platform.nim"
+  exec "nim c -r tests/test_toml.nim"
   exec "nim c -r tests/test_config.nim"
   exec "nim c -r tests/test_install.nim"
   exec "nim c -r tests/test_statusline.nim"

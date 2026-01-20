@@ -4,7 +4,7 @@
 
 **Get Stuff Done.** *(Or, you know, the other version.)*
 
-A meta-prompting and context engineering system for Claude Code (Codex CLI integration planned).
+A meta-prompting and context engineering system for Claude Code and Codex CLI.
 
 [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
 
@@ -27,14 +27,14 @@ The system provides:
 
 **Active.** The installer is a native Nim binary; releases bundle the binary and all prompt content.
 
-**Next:** After this milestone lands tonight, Codex CLI integration is planned for tomorrow.
+**Next:** Polish Codex CLI integration and docs.
 
 ## Platforms
 
 | Platform | Status |
 |----------|--------|
 | Claude Code | Supported |
-| Codex CLI | Planned |
+| Codex CLI | Supported (beta) |
 
 ## Installation
 
@@ -54,6 +54,9 @@ cd gsd-darwin-arm64
 
 # Or install locally (to ./.claude in current project)
 ./gsd install --local
+
+# Install for Codex CLI (to ~/.codex)
+./gsd install --platform=codex --global
 ```
 
 Release bundles will be available for:

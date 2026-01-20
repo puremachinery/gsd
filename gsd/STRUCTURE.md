@@ -1,7 +1,7 @@
 # Structure (Recommended)
 
 ```
-planning/
+.planning/
   phases/
     01-plan.md
     02-execute.md
@@ -13,4 +13,4 @@ planning/
   VERIFICATION.md
 ```
 
-Keep planning artifacts separate from source code. Adjust paths as needed for the host tool.
+Keep planning artifacts separate from source code. Default location in this repo is `.planning/`; adjust paths as needed for the host tool.
