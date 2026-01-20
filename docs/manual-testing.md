@@ -99,6 +99,8 @@ rm -rf ~/.claude ~/.codex
    All 2 installations are healthy!
    ```
 
+**Note:** If you have both local and global installs, doctor will report each installation separately.
+
 ---
 
 ## Scenario 3: Install Single Platform (Claude Only)
@@ -187,6 +189,8 @@ rm -rf ~/.claude ~/.codex
    All 2 installations are healthy!
    ```
 
+**Note:** If you also have local installs (./.claude and/or ./.codex), doctor will include them too.
+
 3. Run doctor for specific platform:
    ```bash
    ./gsd doctor --platform=codex
@@ -245,6 +249,8 @@ rm -rf ~/.claude ~/.codex
 
    Update complete!
    ```
+
+**Note:** If local installs exist, they are updated too.
 
 3. **Verify versions match:**
    ```bash
@@ -312,6 +318,8 @@ rm -rf ~/.claude ~/.codex
    Enter choice [1-3]:
    ```
 
+   **Note:** Paths reflect the actual install location (local or global).
+
 3. Enter `1` to uninstall Claude only.
 
 4. **Expected:**
@@ -346,6 +354,8 @@ rm -rf ~/.claude ~/.codex
    Uninstalling GSD from /Users/<you>/.codex (Codex CLI)...
    GSD uninstalled.
    ```
+
+**Note:** If local installs exist, they are removed too.
 
 3. **Verify:**
    ```bash
@@ -543,6 +553,68 @@ rm ~/.claude/gsd/VERSION
 ./gsd doctor --platform=claude
 ```
 **Expected:** Reports "VERSION file missing" as an issue.
+
+---
+
+## Scenario 19: Local + Global Installs (Same Platform)
+
+**Setup:** Install both local and global for Claude.
+```bash
+rm -rf ~/.claude ./.claude
+./gsd install --global --platform=claude
+./gsd install --local --platform=claude
+```
+
+**Steps:**
+
+1. Run doctor:
+   ```bash
+   ./gsd doctor --platform=claude
+   ```
+
+2. **Expected:** Two entries, one for each install path:
+   ```
+   Checking GSD installation at /Users/<you>/.claude (claude)...
+   ...
+
+   ---
+
+   Checking GSD installation at /path/to/project/.claude (claude)...
+   ...
+
+   ===
+
+   All 2 installations are healthy!
+   ```
+
+3. Run update:
+   ```bash
+   ./gsd update --platform=claude
+   ```
+
+4. **Expected:** Both installs are re-installed.
+
+---
+
+## Scenario 20: GSD_CONFIG_DIR Override
+
+**Setup:** Custom config directory containing a valid gsd-config.json.
+
+**Steps:**
+
+1. Set override:
+   ```bash
+   export GSD_CONFIG_DIR="/custom/gsd/config"
+   ```
+
+2. Run doctor:
+   ```bash
+   ./gsd doctor --config-dir "$GSD_CONFIG_DIR"
+   ```
+
+3. **Expected:** Only the specified directory is checked.
+
+**Note:** `GSD_CONFIG_DIR` is ignored for platform-specific commands if the config’s platform doesn’t match the requested platform.
 
 ---
 
