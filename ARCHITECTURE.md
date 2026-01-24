@@ -139,4 +139,32 @@ Model Name │ Building auth system │ project │ ██████░░░�
 ## Platform Notes
 
 - **Claude Code:** Uses `commands/gsd` for slash commands and `settings.json` hooks (`statusLine`, `hooks`).
-- **Codex CLI:** Uses its own config root (via `--config-dir`, `$CODEX_HOME`, or default). The same prompt content applies, but integration files are tool-specific.
+- **Codex CLI:** Uses `prompts/gsd-*.md` for commands, `AGENTS.md` for agent definitions, and `config.toml` for hooks.
+
+### Codex CLI Integration Decisions
+
+These decisions were made during the v0.2.0 implementation:
+
+**1. Config Root: `~/.codex`**
+
+Uses `~/.codex/` as the default config directory, mirroring the Claude Code approach (`~/.claude/`). No XDG path support or `CODEX_HOME` env var—kept simple and predictable. Custom paths are supported via `--config-dir`.
+
+**2. Integration Surface: AGENTS.md + prompts/**
+
+| Claude Code | Codex CLI |
+|-------------|-----------|
+| `commands/gsd/*.md` | `prompts/gsd-*.md` |
+| `agents/gsd-*.md` (separate files) | `AGENTS.md` (concatenated) |
+| `settings.json` hooks | `config.toml` `[[notify]]` hooks |
+
+Commands are installed as `prompts/gsd-help.md`, `prompts/gsd-new-project.md`, etc. Agents are concatenated into a single `AGENTS.md` file (Codex convention). The `#gsd` marker tags GSD-owned hooks for safe updates.
+
+**3. Repo Layout: Shared Source**
+
+No separate `codex/` or `platforms/codex/` directory. The same source content (`gsd/`, `commands/`, `agents/`) is used for both platforms. The installer handles platform-specific transformations:
+
+- Path references rewritten during install (`~/.claude/` → `~/.codex/`)
+- Commands renamed (`help.md` → `gsd-help.md`)
+- Agents concatenated into single file
+
+This avoids content duplication and ensures both platforms stay in sync.
