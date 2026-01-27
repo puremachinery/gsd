@@ -216,6 +216,25 @@ suite "findConfigDir resolution":
     let found = findConfigDir(pClaudeCode)
     check found.isNone
 
+  test "findConfigDir(platform) uses env dir when config missing but markers match":
+    let tempDir = getTempDir() / "gsd_test_env_markers"
+    createDir(tempDir / "prompts")
+    writeFile(tempDir / "prompts" / "gsd-help.md", "# prompt")
+    writeFile(tempDir / "AGENTS.md", "# agents")
+    defer: removeDir(tempDir)
+
+    let oldEnv = getEnv(ConfigEnvVar)
+    putEnv(ConfigEnvVar, tempDir)
+    defer:
+      if oldEnv.len > 0:
+        putEnv(ConfigEnvVar, oldEnv)
+      else:
+        delEnv(ConfigEnvVar)
+
+    let found = findConfigDir(pCodexCli)
+    check found.isSome
+    check found.get() == tempDir
+
 suite "install enumeration":
   test "inferInstallType identifies local/global/custom":
     let originalDir = getCurrentDir()
@@ -241,6 +260,28 @@ suite "install enumeration":
     check inferInstallType(platform.getLocalConfigDir(pClaudeCode), pClaudeCode) == itLocal
     check inferInstallType(platform.getGlobalConfigDir(pClaudeCode), pClaudeCode) == itGlobal
     check inferInstallType(tempHome / "custom", pClaudeCode) == itCustom
+
+  test "inferPlatformFromDir detects Claude markers":
+    let tempDir = getTempDir() / "gsd_test_infer_claude"
+    createDir(tempDir / "commands" / "gsd")
+    createDir(tempDir / "agents")
+    writeFile(tempDir / "agents" / "gsd-agent.md", "# agent")
+    defer: removeDir(tempDir)
+
+    let inferred = inferPlatformFromDir(tempDir)
+    check inferred.isSome
+    check inferred.get() == pClaudeCode
+
+  test "inferPlatformFromDir detects Codex markers":
+    let tempDir = getTempDir() / "gsd_test_infer_codex"
+    createDir(tempDir / "prompts")
+    writeFile(tempDir / "prompts" / "gsd-help.md", "# prompt")
+    writeFile(tempDir / "AGENTS.md", "# agents")
+    defer: removeDir(tempDir)
+
+    let inferred = inferPlatformFromDir(tempDir)
+    check inferred.isSome
+    check inferred.get() == pCodexCli
 
   test "listInstalledConfigs returns local and global installs":
     let originalDir = getCurrentDir()

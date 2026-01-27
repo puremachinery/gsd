@@ -193,6 +193,11 @@ proc cmdInstall(args: seq[string]) =
       # Non-interactive: default to Claude Code
       platformChoice = pcClaude
 
+  if baseOpts.installType == itCustom and platformChoice == pcBoth:
+    stderr.writeLine "Error: --config-dir cannot be used with --platform=both."
+    stderr.writeLine "Install each platform separately with its own --config-dir."
+    quit(1)
+
   let sourceDir = findSourceDir()
 
   # Verify source directory has required content
@@ -277,10 +282,31 @@ proc cmdUninstall(args: seq[string]) =
 
   # Normalize explicit config dir if provided
   if configDir.len > 0:
+    if platformExplicit and platformChoice == pcBoth:
+      stderr.writeLine "Error: --config-dir cannot be used with --platform=both."
+      stderr.writeLine "Specify a single platform or omit --platform."
+      quit(1)
+
     configDir = expandPath(configDir)
     # Uninstall from specific config dir
     let cfg = loadConfig(configDir)
-    let targetPlatform = if cfg.isSome: cfg.get().platform else: pClaudeCode
+    var targetPlatform = pClaudeCode
+    if platformExplicit:
+      targetPlatform = platformChoiceToSeq(platformChoice)[0]
+      if cfg.isSome and cfg.get().platform != targetPlatform:
+        stderr.writeLine "Error: gsd-config.json platform does not match --platform."
+        quit(1)
+    elif cfg.isSome:
+      targetPlatform = cfg.get().platform
+    else:
+      let inferred = inferPlatformFromDir(configDir)
+      if inferred.isSome:
+        targetPlatform = inferred.get()
+      else:
+        stderr.writeLine "Error: Unable to determine platform for ", configDir, "."
+        stderr.writeLine "Provide --platform or restore gsd-config.json."
+        quit(1)
+
     discard uninstall(configDir, verbose, targetPlatform)
     return
 
@@ -529,8 +555,17 @@ proc cmdDoctor(args: seq[string]) =
   if configDir.len > 0:
     let resolvedDir = expandPath(configDir)
     let cfg = loadConfig(resolvedDir)
+    if platformExplicit and cfg.isSome and cfg.get().platform != targetPlatform:
+      stderr.writeLine "Error: gsd-config.json platform does not match --platform."
+      quit(1)
     if cfg.isSome:
       targetPlatform = cfg.get().platform
+    elif not platformExplicit:
+      let inferred = inferPlatformFromDir(resolvedDir)
+      if inferred.isSome:
+        targetPlatform = inferred.get()
+      else:
+        echo "Warning: Unable to determine platform for ", resolvedDir, "; defaulting to claude."
 
     echo "Checking GSD installation at ", resolvedDir, " (", $targetPlatform, ")..."
     echo ""

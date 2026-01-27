@@ -76,6 +76,36 @@ proc inferInstallType*(dir: string, p: Platform): InstallType =
     return itGlobal
   return itCustom
 
+proc hasGsdPrefixedFiles(dir: string): bool =
+  if not dirExists(dir):
+    return false
+  for kind, path in walkDir(dir):
+    if kind == pcFile:
+      let filename = extractFilename(path)
+      if filename.startsWith("gsd-") and filename.endsWith(".md"):
+        return true
+  return false
+
+proc inferPlatformFromDir*(configDir: string): Option[Platform] =
+  ## Infer platform from config directory contents
+  let expanded = expandPath(configDir)
+  if expanded.len == 0 or not dirExists(expanded):
+    return none(Platform)
+
+  let hasClaudeCommands = dirExists(expanded / "commands" / "gsd")
+  let hasClaudeAgents = hasGsdPrefixedFiles(expanded / "agents")
+  let hasCodexPrompts = hasGsdPrefixedFiles(expanded / CodexPromptsDir)
+  let hasCodexAgents = fileExists(expanded / CodexAgentsMdFile)
+
+  let claudeScore = (if hasClaudeCommands: 2 else: 0) + (if hasClaudeAgents: 1 else: 0)
+  let codexScore = (if hasCodexPrompts: 2 else: 0) + (if hasCodexAgents: 1 else: 0)
+
+  if claudeScore > 0 and codexScore == 0:
+    return some(pClaudeCode)
+  if codexScore > 0 and claudeScore == 0:
+    return some(pCodexCli)
+  return none(Platform)
+
 proc getLocalConfigDir*(): string =
   ## Returns ./.claude (Claude Code default)
   result = getCurrentDir() / ".claude"
@@ -158,6 +188,10 @@ proc findConfigDir*(p: Platform, explicit: string = ""): Option[string] =
     let cfg = loadConfig(envDir.get())
     if cfg.isSome and cfg.get().platform == p:
       return envDir
+    if cfg.isNone:
+      let inferred = inferPlatformFromDir(envDir.get())
+      if inferred.isSome and inferred.get() == p:
+        return envDir
 
   # Check local first
   let localDir = platform.getLocalConfigDir(p)
@@ -193,6 +227,10 @@ proc listInstalledConfigs*(): seq[InstalledConfig] =
     let cfg = loadConfig(envDir.get())
     if cfg.isSome:
       addInstalledConfig(result, cfg.get().platform, envDir.get())
+    else:
+      let inferred = inferPlatformFromDir(envDir.get())
+      if inferred.isSome:
+        addInstalledConfig(result, inferred.get(), envDir.get())
 
 proc findVersionFile*(explicit: string = ""): Option[string] =
   ## Find VERSION file, checking local then global
