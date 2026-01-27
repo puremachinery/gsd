@@ -616,6 +616,8 @@ rm -rf ~/.claude ./.claude
 
 **Note:** `GSD_CONFIG_DIR` is ignored for platform-specific commands if the config’s platform doesn’t match the requested platform.
 
+**Note:** `--config-dir` cannot be combined with `--platform=both`. If `gsd-config.json` is missing, GSD will infer the platform from installed files; provide `--platform` if inference is ambiguous.
+
 ---
 
 ## Test Matrix Summary
