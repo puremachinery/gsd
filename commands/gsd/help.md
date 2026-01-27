@@ -17,7 +17,9 @@ Output ONLY the reference content below. Do NOT add:
 <reference>
 # GSD Command Reference
 
-**GSD** (Get Shit Done) creates hierarchical project plans optimized for solo agentic development with supported tools (Claude Code; Codex CLI planned).
+**GSD** (Get Shit Done) creates hierarchical project plans optimized for solo agentic development with supported tools (Claude Code and Codex CLI).
+
+**Codex CLI note:** Commands are installed as prompts. Use `/prompts:gsd-<command>` (e.g., `/prompts:gsd-help`).
 
 ## Quick Start
 

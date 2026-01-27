@@ -4,45 +4,30 @@ description: Update GSD to latest version with changelog display
 ---
 
 <objective>
-Check for GSD updates, install if available, and display what changed.
+Check for GSD updates, show what changed, and guide the update.
 </objective>
 
 <process>
 
-<step name="get_installed_version">
-Check for VERSION file (local install takes priority over global):
+<step name="list_installed_versions">
+(Optional) list installed versions across local/global installs:
 
 ```bash
-# Try local first, then global
-if [ -f "./.claude/gsd/VERSION" ]; then
-  cat ./.claude/gsd/VERSION
-elif [ -f ~/.claude/gsd/VERSION ]; then
-  cat ~/.claude/gsd/VERSION
-else
-  echo "not-installed"
-fi
+for root in ".claude" ".codex" "$HOME/.claude" "$HOME/.codex"; do
+  if [ -f "$root/gsd/VERSION" ]; then
+    echo "$root -> $(cat "$root/gsd/VERSION")"
+  fi
+done
 ```
 
-**If VERSION file missing:**
-```
-## GSD Update
-
-**Installed version:** Unknown
-
-Your installation doesn't include version tracking.
-
-Please reinstall GSD from https://github.com/puremachinery/gsd/releases
-```
-
-Proceed to check step (treat as version 0.0.0 for comparison).
+If no VERSION files are found, continue with update instructions anyway.
 </step>
 
 <step name="check_latest_version">
-Check GitHub API for latest release:
+Check GitHub API for latest release (if your tool supports web browsing/fetch):
 
-Use WebFetch tool with:
 - URL: `https://api.github.com/repos/puremachinery/gsd/releases/latest`
-- Prompt: "Extract the tag_name field (version number) from this GitHub release JSON. If the response is a 404 or 'Not Found', return 'no-releases'."
+- Extract the `tag_name` field (version number). If the response is a 404 or "Not Found", treat as "no-releases".
 
 **If response is 404 or "Not Found"** (no releases published yet):
 ```
@@ -62,35 +47,7 @@ Couldn't check for updates (offline or GitHub unavailable).
 Check manually: https://github.com/puremachinery/gsd/releases
 ```
 
-STOP here if GitHub unavailable.
-</step>
-
-<step name="compare_versions">
-Compare installed vs latest:
-
-**If installed == latest:**
-```
-## GSD Update
-
-**Installed:** X.Y.Z
-**Latest:** X.Y.Z
-
-You're already on the latest version.
-```
-
-STOP here if already up to date.
-
-**If installed > latest:**
-```
-## GSD Update
-
-**Installed:** X.Y.Z
-**Latest:** A.B.C
-
-You're ahead of the latest release (development version?).
-```
-
-STOP here if ahead.
+Proceed to update instructions.
 </step>
 
 <step name="show_changes_and_confirm">
@@ -103,8 +60,7 @@ STOP here if ahead.
 ```
 ## GSD Update Available
 
-**Installed:** X.Y.Z
-**Latest:** X.Y.Z+1
+**Latest:** X.Y.Z
 
 ### What's New
 ────────────────────────────────────────────────────────────
@@ -114,40 +70,38 @@ STOP here if ahead.
 ────────────────────────────────────────────────────────────
 ```
 
-Use AskUserQuestion:
-- Question: "Proceed with update?"
-- Options:
-  - "Yes, update now"
-  - "No, cancel"
+Ask the user:
+- "Proceed with update?"
+- Options: "Yes, update now" / "No, cancel"
 
 **If user cancels:** STOP here.
 </step>
 
 <step name="run_update">
-Guide user to download and install. **Match the install type detected in step 1:**
+Preferred update path (works for Claude Code and Codex CLI):
 
-**If local VERSION was found** (`./.claude/gsd/VERSION`):
 ```
-Download the latest release for your platform:
-https://github.com/puremachinery/gsd/releases/latest
+# Updates all detected installs (local + global)
+gsd update
 
-Then run: gsd install --local
-```
-
-**If global VERSION was found** (`~/.claude/gsd/VERSION`):
-```
-Download the latest release for your platform:
-https://github.com/puremachinery/gsd/releases/latest
-
-Then run: gsd install --global
+# Or target a specific platform
+# gsd update --platform=claude
+# gsd update --platform=codex
 ```
 
-Clear the update cache so statusline indicator disappears:
+If `gsd update` fails with "Cannot find GSD source files" or `gsd` is not on PATH:
 
-```bash
-# Clear from the detected install location
-rm -f ./.claude/cache/gsd-update-check.json 2>/dev/null   # if local
-rm -f ~/.claude/cache/gsd-update-check.json 2>/dev/null   # if global
+1. Download the latest release bundle for your platform:
+   https://github.com/puremachinery/gsd/releases/latest
+2. Run the updater from the extracted bundle directory:
+   ```bash
+   ./gsd update
+   ```
+
+If you prefer a manual reinstall, use:
+```
+./gsd install --platform=claude --global   # or --local
+./gsd install --platform=codex  --global   # or --local
 ```
 </step>
 
@@ -156,10 +110,10 @@ Format completion message:
 
 ```
 ╔═══════════════════════════════════════════════════════════╗
-║  GSD Updated: vX.Y.Z → vX.Y.Z+1                           ║
+║  GSD Updated                                               ║
 ╚═══════════════════════════════════════════════════════════╝
 
-Restart your tool (Claude Code; Codex CLI planned) to pick up the new commands.
+Restart your tool (Claude Code or Codex CLI) to pick up the new commands.
 
 View full changelog: https://github.com/puremachinery/gsd/blob/master/CHANGELOG.md
 ```
@@ -168,11 +122,9 @@ View full changelog: https://github.com/puremachinery/gsd/blob/master/CHANGELOG.
 </process>
 
 <success_criteria>
-- [ ] Installed version read correctly
-- [ ] Latest version checked via GitHub API
-- [ ] Update skipped if already current
-- [ ] Changelog fetched and displayed BEFORE update
-- [ ] User confirmation obtained
-- [ ] Update executed successfully
+- [ ] Latest version checked (or manual check instructed)
+- [ ] Changelog preview shown when available
+- [ ] User confirmation obtained before update
+- [ ] Update executed successfully (or manual instructions provided)
 - [ ] Restart reminder shown
 </success_criteria>
