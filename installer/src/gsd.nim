@@ -143,7 +143,11 @@ proc cmdInstall(args: seq[string]) =
   var platformExplicit = false
   var platformChoice = pcClaude
 
-  var p = initOptParser(args)
+  var p = initOptParser(
+    args,
+    shortNoVal = {'g', 'l', 'h'},
+    longNoVal = @["global", "local", "force-statusline", "verbose", "help"]
+  )
   while true:
     p.next()
     case p.kind
@@ -247,7 +251,11 @@ proc cmdUninstall(args: seq[string]) =
   var uninstallAll = false
 
   # First pass: parse all flags
-  var p = initOptParser(args)
+  var p = initOptParser(
+    args,
+    shortNoVal = {'g', 'l'},
+    longNoVal = @["global", "local", "all", "verbose"]
+  )
   while true:
     p.next()
     case p.kind
@@ -530,7 +538,11 @@ proc cmdDoctor(args: seq[string]) =
   var targetPlatform = pClaudeCode
   var platformExplicit = false
 
-  var p = initOptParser(args)
+  var p = initOptParser(
+    args,
+    shortNoVal = {'h'},
+    longNoVal = @["help"]
+  )
   while true:
     p.next()
     case p.kind
@@ -546,6 +558,13 @@ proc cmdDoctor(args: seq[string]) =
         except ValueError as e:
           stderr.writeLine "Error: ", e.msg
           quit(1)
+      of "h", "help":
+        echo "Usage: gsd doctor [options]"
+        echo ""
+        echo "Options:"
+        echo "  -c, --config-dir <path>   Check a specific config directory"
+        echo "  -p, --platform <name>     Target: claude or codex"
+        quit(0)
       else:
         discard
     of cmdArgument:
@@ -708,7 +727,11 @@ proc cmdCheckUpdate(args: seq[string]) =
   var silent = true
   var configDir = ""
 
-  var p = initOptParser(args)
+  var p = initOptParser(
+    args,
+    shortNoVal = {'v', 'h'},
+    longNoVal = @["verbose", "help"]
+  )
   while true:
     p.next()
     case p.kind
@@ -719,6 +742,13 @@ proc cmdCheckUpdate(args: seq[string]) =
         silent = false
       of "c", "config-dir":
         configDir = p.val
+      of "h", "help":
+        echo "Usage: gsd check-update [options]"
+        echo ""
+        echo "Options:"
+        echo "  -v, --verbose             Show update status"
+        echo "  -c, --config-dir <path>   Check a specific config directory"
+        quit(0)
       else:
         discard
     of cmdArgument:
@@ -729,7 +759,11 @@ proc cmdCheckUpdate(args: seq[string]) =
 proc cmdStatusline(args: seq[string]) =
   var configDir = ""
 
-  var p = initOptParser(args)
+  var p = initOptParser(
+    args,
+    shortNoVal = {'h'},
+    longNoVal = @["help"]
+  )
   while true:
     p.next()
     case p.kind
@@ -738,6 +772,12 @@ proc cmdStatusline(args: seq[string]) =
       case p.key
       of "c", "config-dir":
         configDir = p.val
+      of "h", "help":
+        echo "Usage: gsd statusline [options]"
+        echo ""
+        echo "Options:"
+        echo "  -c, --config-dir <path>   Use a specific config directory"
+        quit(0)
       else:
         discard
     of cmdArgument:
@@ -750,7 +790,11 @@ proc cmdUpdate(args: seq[string]) =
   var verbose = false
   var platformChoice: Option[PlatformChoice] = none(PlatformChoice)
 
-  var p = initOptParser(args)
+  var p = initOptParser(
+    args,
+    shortNoVal = {'h'},
+    longNoVal = @["verbose", "help"]
+  )
   while true:
     p.next()
     case p.kind

@@ -9,11 +9,19 @@ proc repoRoot(): string =
 
 proc buildGsdBinary(): string =
   var binPath = getTempDir() / "gsd-test-bin" / "gsd-test"
+  let sourceDir = repoRoot() / "installer" / "src"
   if fileExists(binPath):
-    return binPath
+    let binTime = getLastModificationTime(binPath)
+    var needsRebuild = false
+    for path in walkDirRec(sourceDir):
+      if path.endsWith(".nim") and getLastModificationTime(path) > binTime:
+        needsRebuild = true
+        break
+    if not needsRebuild:
+      return binPath
 
   createDir(parentDir(binPath))
-  let sourcePath = repoRoot() / "installer" / "src" / "gsd.nim"
+  let sourcePath = sourceDir / "gsd.nim"
   let p = startProcess(
     "nim",
     args = @["c", "-o:" & binPath, sourcePath],
@@ -270,3 +278,37 @@ suite "CLI integration":
     for dir in [claudeLocal, codexLocal, claudeGlobal, codexGlobal]:
       check not fileExists(dir / ConfigFileName)
       check not dirExists(dir / "gsd")
+
+  test "uninstall --config-dir infers platform without config":
+    let bin = buildGsdBinary()
+    let workDir = prepareWorkspace()
+    let tempHome = getTempDir() / ("gsd_cli_custom_" & $epochTime().int)
+    createDir(tempHome)
+
+    let customDir = tempHome / "gsd-custom"
+    createDir(customDir)
+    copyDir(workDir / "gsd", customDir / "gsd")
+    createDir(customDir / "commands")
+    copyDir(workDir / "commands" / "gsd", customDir / "commands" / "gsd")
+    createDir(customDir / "agents")
+    writeFile(customDir / "agents" / "gsd-planner.md", "# agent")
+
+    let oldEnv = getEnv(ConfigEnvVar)
+    clearEnvVar(ConfigEnvVar)
+    defer:
+      if oldEnv.len > 0: putEnv(ConfigEnvVar, oldEnv) else: delEnv(ConfigEnvVar)
+      removeDir(workDir)
+      removeDir(tempHome)
+
+    let output = execProcess(
+      bin,
+      args = @["uninstall", "--config-dir", customDir],
+      options = {poUsePath, poStdErrToStdOut},
+      workingDir = workDir
+    )
+
+    check output.contains("Uninstalling GSD from " & customDir)
+    check not output.contains("(Codex CLI)")
+    check not dirExists(customDir / "gsd")
+    check not dirExists(customDir / "commands" / "gsd")
+    check not fileExists(customDir / "agents" / "gsd-planner.md")
