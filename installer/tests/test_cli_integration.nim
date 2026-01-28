@@ -44,29 +44,47 @@ proc prepareWorkspace(): string =
   copyDir(repoRoot() / "agents", workDir / "agents")
   return workDir
 
-proc writeConfig(dir: string, p: Platform, installType: InstallType) =
-  createDir(dir)
+proc writeConfig(gsdDir: string, platforms: seq[Platform], installType: InstallType) =
+  ## Write a v0.3 gsd-config.json to a .gsd/ directory
+  createDir(gsdDir)
+  var platArr = newJArray()
+  for p in platforms:
+    platArr.add(%($p))
   let payload = %*{
     "version": Version,
     "install_type": $installType,
-    "platform": $p,
-    "config_dir": dir,
+    "gsd_dir": gsdDir,
+    "platforms": platArr,
     "installed_at": "2026-01-01T00:00:00Z"
   }
-  writeFile(dir / ConfigFileName, payload.pretty())
+  writeFile(gsdDir / ConfigFileName, payload.pretty())
 
-proc seedClaudeInstall(workDir, dir: string, installType: InstallType) =
-  writeConfig(dir, pClaudeCode, installType)
-  copyDir(workDir / "gsd", dir / "gsd")
-  createDir(dir / "commands")
-  copyDir(workDir / "commands" / "gsd", dir / "commands" / "gsd")
-  copyDir(workDir / "agents", dir / "agents")
-  writeFile(dir / "gsd" / VersionFileName, Version)
+proc seedClaudeInstall(workDir, gsdDir: string, installType: InstallType) =
+  ## Seed a v0.3 install: shared resources in .gsd/, tool files in .claude/
+  writeConfig(gsdDir, @[pClaudeCode], installType)
+  # Copy shared resources into .gsd/ (contents, not the dir itself)
+  let gsdSource = workDir / "gsd"
+  for kind, path in walkDir(gsdSource):
+    let name = extractFilename(path)
+    if kind == pcDir:
+      copyDir(path, gsdDir / name)
+    elif kind == pcFile:
+      copyFile(path, gsdDir / name)
+  writeFile(gsdDir / VersionFileName, Version)
+  # Tool-specific files in .claude/ (sibling of .gsd/)
+  let scopeRoot = parentDir(gsdDir)
+  let toolDir = scopeRoot / ".claude"
+  createDir(toolDir / "commands")
+  copyDir(workDir / "commands" / "gsd", toolDir / "commands" / "gsd")
+  createDir(toolDir / "agents")
+  for kind, path in walkDir(workDir / "agents"):
+    if kind == pcFile:
+      copyFile(path, toolDir / "agents" / extractFilename(path))
 
-proc seedMinimalInstall(dir: string, p: Platform, installType: InstallType) =
-  writeConfig(dir, p, installType)
-  createDir(dir / "gsd")
-  writeFile(dir / "gsd" / VersionFileName, Version)
+proc seedMinimalInstall(gsdDir: string, platforms: seq[Platform], installType: InstallType) =
+  ## Seed a minimal v0.3 install: config + VERSION in .gsd/
+  writeConfig(gsdDir, platforms, installType)
+  writeFile(gsdDir / VersionFileName, Version)
 
 proc clearEnvVar(key: string) =
   if getEnv(key).len > 0:
@@ -79,11 +97,11 @@ suite "CLI integration":
     let tempHome = getTempDir() / ("gsd_cli_home_" & $epochTime().int)
     createDir(tempHome)
 
-    let localDir = workDir / ".claude"
-    let globalDir = tempHome / ".claude"
+    let localGsd = workDir / ".gsd"
+    let globalGsd = tempHome / ".gsd"
 
-    writeConfig(localDir, pClaudeCode, itLocal)
-    writeConfig(globalDir, pClaudeCode, itGlobal)
+    writeConfig(localGsd, @[pClaudeCode], itLocal)
+    writeConfig(globalGsd, @[pClaudeCode], itGlobal)
 
     let oldHome = getEnv("HOME")
     let oldEnv = getEnv(ConfigEnvVar)
@@ -103,8 +121,8 @@ suite "CLI integration":
     )
 
     check output.contains("Update complete!")
-    check fileExists(localDir / "gsd" / VersionFileName)
-    check fileExists(globalDir / "gsd" / VersionFileName)
+    check fileExists(localGsd / VersionFileName)
+    check fileExists(globalGsd / VersionFileName)
 
   test "uninstall --platform=claude removes local and global installs":
     let bin = buildGsdBinary()
@@ -112,11 +130,11 @@ suite "CLI integration":
     let tempHome = getTempDir() / ("gsd_cli_home_" & $epochTime().int)
     createDir(tempHome)
 
-    let localDir = workDir / ".claude"
-    let globalDir = tempHome / ".claude"
+    let localGsd = workDir / ".gsd"
+    let globalGsd = tempHome / ".gsd"
 
-    seedMinimalInstall(localDir, pClaudeCode, itLocal)
-    seedMinimalInstall(globalDir, pClaudeCode, itGlobal)
+    seedMinimalInstall(localGsd, @[pClaudeCode], itLocal)
+    seedMinimalInstall(globalGsd, @[pClaudeCode], itGlobal)
 
     let oldHome = getEnv("HOME")
     let oldEnv = getEnv(ConfigEnvVar)
@@ -135,10 +153,9 @@ suite "CLI integration":
       workingDir = workDir
     )
 
-    check not fileExists(localDir / ConfigFileName)
-    check not fileExists(globalDir / ConfigFileName)
-    check not dirExists(localDir / "gsd")
-    check not dirExists(globalDir / "gsd")
+    # .gsd/ dirs should be removed (only platform was claude)
+    check not dirExists(localGsd)
+    check not dirExists(globalGsd)
 
   test "doctor --platform ignores GSD_CONFIG_DIR for mismatched platform":
     let bin = buildGsdBinary()
@@ -146,11 +163,11 @@ suite "CLI integration":
     let tempHome = getTempDir() / ("gsd_cli_home_" & $epochTime().int)
     createDir(tempHome)
 
-    let localDir = workDir / ".claude"
+    let localGsd = workDir / ".gsd"
     let envDir = tempHome / "gsd-env"
 
-    writeConfig(localDir, pClaudeCode, itLocal)
-    writeConfig(envDir, pCodexCli, itCustom)
+    writeConfig(localGsd, @[pClaudeCode], itLocal)
+    writeConfig(envDir, @[pCodexCli], itCustom)
 
     let oldHome = getEnv("HOME")
     let oldEnv = getEnv(ConfigEnvVar)
@@ -169,7 +186,7 @@ suite "CLI integration":
       workingDir = workDir
     )
 
-    check output.contains(localDir)
+    check output.contains(localGsd)
     check not output.contains(envDir)
 
   test "doctor without flags checks multiple installs":
@@ -178,11 +195,11 @@ suite "CLI integration":
     let tempHome = getTempDir() / ("gsd_cli_home_" & $epochTime().int)
     createDir(tempHome)
 
-    let localDir = workDir / ".claude"
-    let globalDir = tempHome / ".claude"
+    let localGsd = workDir / ".gsd"
+    let globalGsd = tempHome / ".gsd"
 
-    seedClaudeInstall(workDir, localDir, itLocal)
-    seedClaudeInstall(workDir, globalDir, itGlobal)
+    seedClaudeInstall(workDir, localGsd, itLocal)
+    seedClaudeInstall(workDir, globalGsd, itGlobal)
 
     let oldHome = getEnv("HOME")
     let oldEnv = getEnv(ConfigEnvVar)
@@ -201,8 +218,8 @@ suite "CLI integration":
       workingDir = workDir
     )
 
-    check output.contains(localDir)
-    check output.contains(globalDir)
+    check output.contains(localGsd)
+    check output.contains(globalGsd)
     check output.contains("Summary: 0 issue(s), 2 warning(s) across 2 installation(s)")
 
   test "update without platform updates all installs":
@@ -211,15 +228,11 @@ suite "CLI integration":
     let tempHome = getTempDir() / ("gsd_cli_home_" & $epochTime().int)
     createDir(tempHome)
 
-    let claudeLocal = workDir / ".claude"
-    let codexLocal = workDir / ".codex"
-    let claudeGlobal = tempHome / ".claude"
-    let codexGlobal = tempHome / ".codex"
+    let localGsd = workDir / ".gsd"
+    let globalGsd = tempHome / ".gsd"
 
-    writeConfig(claudeLocal, pClaudeCode, itLocal)
-    writeConfig(codexLocal, pCodexCli, itLocal)
-    writeConfig(claudeGlobal, pClaudeCode, itGlobal)
-    writeConfig(codexGlobal, pCodexCli, itGlobal)
+    writeConfig(localGsd, @[pClaudeCode, pCodexCli], itLocal)
+    writeConfig(globalGsd, @[pClaudeCode, pCodexCli], itGlobal)
 
     let oldHome = getEnv("HOME")
     let oldEnv = getEnv(ConfigEnvVar)
@@ -239,8 +252,8 @@ suite "CLI integration":
     )
 
     check output.contains("Update complete!")
-    for dir in [claudeLocal, codexLocal, claudeGlobal, codexGlobal]:
-      check fileExists(dir / "gsd" / VersionFileName)
+    check fileExists(localGsd / VersionFileName)
+    check fileExists(globalGsd / VersionFileName)
 
   test "uninstall --all removes all installs":
     let bin = buildGsdBinary()
@@ -248,15 +261,11 @@ suite "CLI integration":
     let tempHome = getTempDir() / ("gsd_cli_home_" & $epochTime().int)
     createDir(tempHome)
 
-    let claudeLocal = workDir / ".claude"
-    let codexLocal = workDir / ".codex"
-    let claudeGlobal = tempHome / ".claude"
-    let codexGlobal = tempHome / ".codex"
+    let localGsd = workDir / ".gsd"
+    let globalGsd = tempHome / ".gsd"
 
-    seedMinimalInstall(claudeLocal, pClaudeCode, itLocal)
-    seedMinimalInstall(codexLocal, pCodexCli, itLocal)
-    seedMinimalInstall(claudeGlobal, pClaudeCode, itGlobal)
-    seedMinimalInstall(codexGlobal, pCodexCli, itGlobal)
+    seedMinimalInstall(localGsd, @[pClaudeCode, pCodexCli], itLocal)
+    seedMinimalInstall(globalGsd, @[pClaudeCode, pCodexCli], itGlobal)
 
     let oldHome = getEnv("HOME")
     let oldEnv = getEnv(ConfigEnvVar)
@@ -275,40 +284,38 @@ suite "CLI integration":
       workingDir = workDir
     )
 
-    for dir in [claudeLocal, codexLocal, claudeGlobal, codexGlobal]:
-      check not fileExists(dir / ConfigFileName)
-      check not dirExists(dir / "gsd")
+    # .gsd/ dirs should be removed
+    check not dirExists(localGsd)
+    check not dirExists(globalGsd)
 
-  test "uninstall --config-dir infers platform without config":
+  test "uninstall --config-dir uses custom .gsd/ directory":
     let bin = buildGsdBinary()
     let workDir = prepareWorkspace()
     let tempHome = getTempDir() / ("gsd_cli_custom_" & $epochTime().int)
     createDir(tempHome)
 
-    let customDir = tempHome / "gsd-custom"
-    createDir(customDir)
-    copyDir(workDir / "gsd", customDir / "gsd")
-    createDir(customDir / "commands")
-    copyDir(workDir / "commands" / "gsd", customDir / "commands" / "gsd")
-    createDir(customDir / "agents")
-    writeFile(customDir / "agents" / "gsd-planner.md", "# agent")
+    let customGsd = tempHome / "gsd-custom"
 
+    # Set up custom .gsd/ with config
+    seedMinimalInstall(customGsd, @[pClaudeCode], itCustom)
+
+    let oldHome = getEnv("HOME")
     let oldEnv = getEnv(ConfigEnvVar)
+    putEnv("HOME", tempHome)
     clearEnvVar(ConfigEnvVar)
     defer:
+      if oldHome.len > 0: putEnv("HOME", oldHome) else: delEnv("HOME")
       if oldEnv.len > 0: putEnv(ConfigEnvVar, oldEnv) else: delEnv(ConfigEnvVar)
       removeDir(workDir)
       removeDir(tempHome)
 
     let output = execProcess(
       bin,
-      args = @["uninstall", "--config-dir", customDir],
+      args = @["uninstall", "--config-dir", customGsd],
       options = {poUsePath, poStdErrToStdOut},
       workingDir = workDir
     )
 
-    check output.contains("Uninstalling GSD from " & customDir)
-    check not output.contains("(Codex CLI)")
-    check not dirExists(customDir / "gsd")
-    check not dirExists(customDir / "commands" / "gsd")
-    check not fileExists(customDir / "agents" / "gsd-planner.md")
+    check output.contains("Uninstalling GSD")
+    # .gsd/ should be removed (single platform)
+    check not dirExists(customGsd)

@@ -54,6 +54,18 @@ suite "getGlobalConfigDir":
     let result = pCodexCli.getGlobalConfigDir()
     check result == getHomeDir() / ".codex"
 
+suite "GSD own directory":
+  test "GsdOwnDirName is .gsd":
+    check GsdOwnDirName == ".gsd"
+
+  test "getLocalGsdDir returns .gsd in current directory":
+    let result = getLocalGsdDir()
+    check result == getCurrentDir() / ".gsd"
+
+  test "getGlobalGsdDir returns .gsd in home directory":
+    let result = getGlobalGsdDir()
+    check result == getHomeDir() / ".gsd"
+
 suite "parsePlatform":
   test "parses 'claude' correctly":
     check parsePlatform("claude") == pClaudeCode

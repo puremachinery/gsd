@@ -42,14 +42,14 @@ suite "expandPath":
     check result == ""
 
 suite "getLocalConfigDir":
-  test "returns .claude in current directory":
+  test "returns .gsd in current directory":
     let result = getLocalConfigDir()
-    check result == getCurrentDir() / ".claude"
+    check result == getCurrentDir() / ".gsd"
 
 suite "getGlobalConfigDir":
-  test "returns .claude in home directory":
+  test "returns .gsd in home directory":
     let result = getGlobalConfigDir()
-    check result == getHomeDir() / ".claude"
+    check result == getHomeDir() / ".gsd"
 
 suite "getGsdCacheDir":
   test "returns cache subdirectory":
@@ -57,9 +57,9 @@ suite "getGsdCacheDir":
     check result == "/some/path/cache"
 
 suite "getGsdDir":
-  test "returns gsd subdirectory":
+  test "returns path directly":
     let result = getGsdDir("/some/path")
-    check result == "/some/path/gsd"
+    check result == "/some/path"
 
 suite "Version constant":
   test "version is defined":
@@ -97,7 +97,8 @@ suite "config round-trip":
     let config = GsdConfig(
       version: "1.2.3",
       installType: itLocal,
-      configDir: "/test/path",
+      platforms: @[pClaudeCode, pCodexCli],
+      gsdDir: "/test/path",
       installedAt: "2025-01-01T00:00:00Z"
     )
 
@@ -107,7 +108,8 @@ suite "config round-trip":
     check loaded.isSome
     check loaded.get().version == "1.2.3"
     check loaded.get().installType == itLocal
-    check loaded.get().configDir == "/test/path"
+    check loaded.get().platforms == @[pClaudeCode, pCodexCli]
+    check loaded.get().gsdDir == "/test/path"
     check loaded.get().installedAt == "2025-01-01T00:00:00Z"
 
   test "loadConfig returns none for missing file":
@@ -142,7 +144,7 @@ suite "findConfigDir resolution":
     check found.isSome
     check found.get() == tempDir
 
-  test "falls back to codex config when claude not present":
+  test "falls back to legacy codex config when .gsd/ not present":
     let originalDir = getCurrentDir()
     let tempHome = getTempDir() / "gsd_test_home"
     let tempWork = getTempDir() / "gsd_test_work"
@@ -172,6 +174,7 @@ suite "findConfigDir resolution":
 
     setCurrentDir(tempWork)
 
+    # v0.2 legacy: config in tool dir
     let codexDir = tempHome / ".codex"
     createDir(codexDir)
     writeFile(codexDir / ConfigFileName, "{}")
@@ -208,19 +211,19 @@ suite "findConfigDir resolution":
 
     setCurrentDir(tempWork)
 
+    # v0.3 config with only codex platform
     let envDir = tempHome / ".envcodex"
     createDir(envDir)
-    writeFile(envDir / ConfigFileName, """{"platform":"codex"}""")
+    writeFile(envDir / ConfigFileName, """{"platforms":["codex"],"gsd_dir":"/tmp"}""")
     putEnv(ConfigEnvVar, envDir)
 
     let found = findConfigDir(pClaudeCode)
     check found.isNone
 
-  test "findConfigDir(platform) uses env dir when config missing but markers match":
+  test "findConfigDir(platform) uses env dir when config has matching platform":
     let tempDir = getTempDir() / "gsd_test_env_markers"
-    createDir(tempDir / "prompts")
-    writeFile(tempDir / "prompts" / "gsd-help.md", "# prompt")
-    writeFile(tempDir / "AGENTS.md", "# agents")
+    createDir(tempDir)
+    writeFile(tempDir / ConfigFileName, """{"platforms":["codex"],"gsd_dir":"/tmp"}""")
     defer: removeDir(tempDir)
 
     let oldEnv = getEnv(ConfigEnvVar)
@@ -257,9 +260,9 @@ suite "install enumeration":
 
     setCurrentDir(tempWork)
 
-    check inferInstallType(platform.getLocalConfigDir(pClaudeCode), pClaudeCode) == itLocal
-    check inferInstallType(platform.getGlobalConfigDir(pClaudeCode), pClaudeCode) == itGlobal
-    check inferInstallType(tempHome / "custom", pClaudeCode) == itCustom
+    check inferInstallType(platform.getLocalGsdDir()) == itLocal
+    check inferInstallType(platform.getGlobalGsdDir()) == itGlobal
+    check inferInstallType(tempHome / "custom") == itCustom
 
   test "inferPlatformFromDir detects Claude markers":
     let tempDir = getTempDir() / "gsd_test_infer_claude"
@@ -283,7 +286,7 @@ suite "install enumeration":
     check inferred.isSome
     check inferred.get() == pCodexCli
 
-  test "listInstalledConfigs returns local and global installs":
+  test "listInstalledConfigs returns platforms from .gsd/ config":
     let originalDir = getCurrentDir()
     let tempHome = getTempDir() / "gsd_test_list_home"
     let tempWork = getTempDir() / "gsd_test_list_work"
@@ -313,14 +316,17 @@ suite "install enumeration":
 
     setCurrentDir(tempWork)
 
-    let claudeLocal = platform.getLocalConfigDir(pClaudeCode)
-    let codexGlobal = platform.getGlobalConfigDir(pCodexCli)
+    # v0.3: local .gsd/ with both platforms
+    let localGsd = platform.getLocalGsdDir()
+    createDir(localGsd)
+    writeFile(localGsd / ConfigFileName, """{"platforms":["claude","codex"],"gsd_dir":"/tmp"}""")
 
-    createDir(claudeLocal)
-    writeFile(claudeLocal / ConfigFileName, """{"platform":"claude"}""")
-    createDir(codexGlobal)
-    writeFile(codexGlobal / ConfigFileName, """{"platform":"codex"}""")
+    # v0.3: global .gsd/ with just claude
+    let globalGsd = platform.getGlobalGsdDir()
+    createDir(globalGsd)
+    writeFile(globalGsd / ConfigFileName, """{"platforms":["claude"],"gsd_dir":"/tmp"}""")
 
     let installs = listInstalledConfigs()
-    check hasInstall(installs, pClaudeCode, claudeLocal)
-    check hasInstall(installs, pCodexCli, codexGlobal)
+    check hasInstall(installs, pClaudeCode, localGsd)
+    check hasInstall(installs, pCodexCli, localGsd)
+    check hasInstall(installs, pClaudeCode, globalGsd)
