@@ -407,8 +407,8 @@ Output: [What artifacts will be created]
 </objective>
 
 <execution_context>
-@~/.claude/gsd/workflows/execute-plan.md
-@~/.claude/gsd/templates/summary.md
+@~/.gsd/workflows/execute-plan.md
+@~/.gsd/templates/summary.md
 </execution_context>
 
 <context>

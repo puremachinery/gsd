@@ -15,7 +15,7 @@ allowed-tools:
 ---
 
 <execution_context>
-@~/.claude/gsd/references/ui-brand.md
+@~/.gsd/references/ui-brand.md
 </execution_context>
 
 <objective>

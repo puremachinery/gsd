@@ -164,7 +164,7 @@ Build authentication system
 
 **Static references** (always load):
 ```
-@~/.claude/gsd/workflows/execute-phase.md
+@~/.gsd/workflows/execute-phase.md
 @.planning/PROJECT.md
 ```
 

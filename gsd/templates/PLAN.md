@@ -28,8 +28,8 @@ Output: [Artifacts created]
 </objective>
 
 <execution_context>
-@~/.claude/gsd/workflows/execute-plan.md
-@~/.claude/gsd/templates/SUMMARY.md
+@~/.gsd/workflows/execute-plan.md
+@~/.gsd/templates/SUMMARY.md
 </execution_context>
 
 <context>
