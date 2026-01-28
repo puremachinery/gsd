@@ -31,6 +31,34 @@ GSD works with Claude Code today and supports Codex CLI. It is designed to exten
 
 ---
 
+## Installed Layout (v0.3)
+
+After install, GSD uses a shared `.gsd/` directory alongside tool-specific directories:
+
+```
+~/.gsd/                     ← GSD-owned, shared
+├── gsd-config.json
+├── templates/
+├── workflows/
+├── references/
+├── cache/
+└── VERSION
+
+~/.claude/                  ← Claude-specific only
+├── commands/gsd/           (refs → @~/.gsd/)
+├── agents/gsd-*.md         (refs → @~/.gsd/)
+└── settings.json
+
+~/.codex/                   ← Codex-specific only
+├── prompts/gsd-*.md        (refs → @~/.gsd/)
+├── AGENTS.md               (refs → @~/.gsd/)
+└── config.toml
+```
+
+Shared resources (templates, workflows, references) live in `.gsd/` and are never duplicated. Tool directories contain only tool-specific integration files (commands, agents, settings).
+
+---
+
 ## Installer / CLI (Nim)
 
 Entry point: `installer/src/gsd.nim`
@@ -42,7 +70,9 @@ Commands:
 - `statusline` (hook)
 - `check-update` (hook)
 
-The installer copies `gsd/`, `commands/`, and `agents/` into the selected config root and merges tool settings without clobbering user customizations.
+The installer performs a two-phase install:
+1. **Shared resources** — copies `gsd/` contents (templates, workflows, references) into `.gsd/`, writes `VERSION` and `gsd-config.json`, creates `cache/`.
+2. **Tool-specific files** — copies commands/agents into `.claude/` or `.codex/`, merges tool settings without clobbering user customizations.
 
 ---
 
@@ -53,23 +83,27 @@ The installer copies `gsd/`, `commands/`, and `agents/` into the selected config
 Resolution order:
 1. `--config-dir` flag (explicit)
 2. `GSD_CONFIG_DIR` env var
-3. Local `./.claude/gsd-config.json` (when running inside a project)
-4. Global `~/.claude/gsd-config.json`
-5. Local `./.codex/gsd-config.json`
-6. Global `~/.codex/gsd-config.json`
+3. Local `./.gsd/gsd-config.json` (when running inside a project)
+4. Global `~/.gsd/gsd-config.json`
+5. Legacy fallback: `.claude/gsd-config.json` or `.codex/gsd-config.json` (v0.2 compat)
 
-`gsd-config.json` stores the resolved config root, install type, and version:
+`gsd-config.json` lives in `.gsd/` and stores the resolved GSD directory, install type, platforms, and version:
 
 ```json
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "install_type": "global",
-  "config_dir": "/Users/name/.claude",
-  "installed_at": "2026-01-17T10:30:00Z"
+  "gsd_dir": "/Users/name/.gsd",
+  "platforms": ["claude", "codex"],
+  "installed_at": "2026-01-28T10:30:00Z"
 }
 ```
 
-Hooks and statusline commands always include `--config-dir` to avoid cwd ambiguity.
+Key fields:
+- `gsd_dir` — path to the `.gsd/` directory (replaces v0.2 `config_dir`)
+- `platforms` — array of installed platforms (replaces v0.2 `platform` string)
+
+Hooks and statusline commands always include `--config-dir` pointing to the `.gsd/` directory to avoid cwd ambiguity.
 
 ---
 
@@ -88,51 +122,66 @@ Claude Code settings use the `statusLine` key and a nested `hooks` object. Codex
 
 ## Path Rewriting and @-Refs
 
-Prompt content uses `@` references for lazy-loading. During install, references are rewritten so they remain correct for:
-- **Global installs** (`~/.claude/gsd/...`)
-- **Local installs** (`./.claude/gsd/...`)
-- **Custom config dirs** (`/custom/path/gsd/...`)
+Prompt content uses `@` references for lazy-loading. The canonical form in source is `@~/.gsd/templates/...`. During install, references are rewritten based on install type:
 
-This keeps content portable without maintaining duplicate copies.
+| Install Type | Rewrite Rule |
+|-------------|-------------|
+| Global | No rewrite needed (source form is correct) |
+| Local | `@~/.gsd/` → `@.gsd/` |
+| Custom | `@~/.gsd/` → `@{customPath}/` |
+
+This keeps content portable without maintaining duplicate copies. The rewriting is simpler than v0.2 since resource paths no longer depend on the platform.
 
 ---
 
 ## Update Checking
 
-`check-update` hits the GitHub releases API with ETag caching. It supports `GITHUB_TOKEN` for higher rate limits and caches results locally to avoid frequent network calls.
+`check-update` hits the GitHub releases API with ETag caching. It supports `GITHUB_TOKEN` for higher rate limits and caches results in `.gsd/cache/` to avoid frequent network calls.
 
 ---
 
 ## Statusline Hook
 
-The statusline hook reads JSON from stdin and writes ANSI output. The exact payload depends on the host tool, but the hook expects model name, task label, and progress.
+The statusline hook reads JSON from stdin (provided by the host tool) and writes ANSI output. It combines host-provided context with local project state.
+
+**Parsed from stdin JSON:**
+- `model.display_name` — model name
+- `workspace.current_dir` — extracts directory basename as project name
+- `session_id` — parsed but not displayed
+- `context_window.remaining_percentage` — rendered as a usage bar
+
+**Read locally:**
+- `.planning/STATE.md` — scans for `**Current:**` or `**Working on:**` markers to show current task
+- `.gsd/cache/gsd-update-check.json` — shows `⬆ update` indicator when a newer release exists
 
 Example input:
 
 ```json
 {
-  "model": {"display_name": "Model Name"},
-  "status": "Building auth system",
-  "phase": "project",
-  "progress": 0.6
+  "model": {"display_name": "Claude Opus 4"},
+  "workspace": {"current_dir": "/Users/name/my-project"},
+  "session_id": "abc-123",
+  "context_window": {"remaining_percentage": 72}
 }
 ```
 
-Example output:
+Example output (with a current task in STATE.md):
 
 ```
-Model Name │ Building auth system │ project │ ██████░░░░ 60%
+Claude Opus 4 │ Implement auth flow │ my-project │ ██░░░░░░░░ 28%
 ```
+
+The context bar shows usage (100 minus remaining). Color thresholds: green < 50%, yellow 50–80%, red+blink >= 80%. Segments with no data are omitted.
 
 ---
 
 ## Local vs Global Storage
 
-| Install Type | Config Dir | Cache/Todos | VERSION |
-|--------------|------------|-------------|---------|
-| Global | `~/.claude/` | `~/.claude/cache/`, `~/.claude/todos/` | `~/.claude/gsd/VERSION` |
-| Local | `./.claude/` | `./.claude/cache/`, `./.claude/todos/` | `./.claude/gsd/VERSION` |
-| Custom | user-specified | `{config}/cache/`, `{config}/todos/` | `{config}/gsd/VERSION` |
+| Install Type | GSD Dir | Tool Dirs | Cache | VERSION |
+|--------------|---------|-----------|-------|---------|
+| Global | `~/.gsd/` | `~/.claude/`, `~/.codex/` | `~/.gsd/cache/` | `~/.gsd/VERSION` |
+| Local | `./.gsd/` | `./.claude/`, `./.codex/` | `./.gsd/cache/` | `./.gsd/VERSION` |
+| Custom | user-specified | inferred from install type | `{gsdDir}/cache/` | `{gsdDir}/VERSION` |
 
 ---
 
@@ -147,7 +196,7 @@ These decisions were made during the v0.2.0 implementation:
 
 **1. Config Root: `~/.codex`**
 
-Uses `~/.codex/` as the default config directory, mirroring the Claude Code approach (`~/.claude/`). No XDG path support or `CODEX_HOME` env var—kept simple and predictable. Custom paths are supported via `--config-dir`.
+Uses `~/.codex/` as the tool-specific config directory, mirroring the Claude Code approach (`~/.claude/`). Shared resources live in `~/.gsd/`. Custom paths are supported via `--config-dir`.
 
 **2. Integration Surface: AGENTS.md + prompts/**
 
@@ -157,13 +206,13 @@ Uses `~/.codex/` as the default config directory, mirroring the Claude Code appr
 | `agents/gsd-*.md` (separate files) | `AGENTS.md` (concatenated) |
 | `settings.json` hooks | `config.toml` `[[notify]]` hooks |
 
-Commands are installed as `prompts/gsd-help.md`, `prompts/gsd-new-project.md`, etc. Agents are concatenated into a single `AGENTS.md` file (Codex convention). The `#gsd` marker tags GSD-owned hooks for safe updates.
+Commands are installed as `prompts/gsd-help.md`, `prompts/gsd-help.md`, etc. Agents are concatenated into a single `AGENTS.md` file (Codex convention). The `#gsd` marker tags GSD-owned hooks for safe updates.
 
 **3. Repo Layout: Shared Source**
 
 No separate `codex/` or `platforms/codex/` directory. The same source content (`gsd/`, `commands/`, `agents/`) is used for both platforms. The installer handles platform-specific transformations:
 
-- Path references rewritten during install (`~/.claude/` → `~/.codex/`)
+- Path references rewritten during install (`@~/.gsd/` adjusted for local/custom installs)
 - Commands renamed (`help.md` → `gsd-help.md`)
 - Agents concatenated into single file
 

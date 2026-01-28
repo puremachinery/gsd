@@ -5,7 +5,7 @@ Manual test scenarios for validating GSD installation and multi-platform support
 **Prerequisites:**
 - Built `gsd` binary (run `nimble build` in `installer/`)
 - Access to a terminal
-- Clean state recommended: back up and remove `~/.claude` and `~/.codex` before testing
+- Clean state recommended: back up and remove `~/.gsd`, `~/.claude`, and `~/.codex` before testing
 
 ---
 
@@ -13,7 +13,7 @@ Manual test scenarios for validating GSD installation and multi-platform support
 
 **Setup:**
 ```bash
-rm -rf ~/.claude ~/.codex
+rm -rf ~/.gsd ~/.claude ~/.codex
 ```
 
 **Steps:**
@@ -53,8 +53,9 @@ rm -rf ~/.claude ~/.codex
 
 5. **Verify files exist:**
    ```bash
-   ls ~/.claude/gsd-config.json ~/.claude/gsd/VERSION
-   ls ~/.codex/gsd-config.json ~/.codex/gsd/VERSION
+   ls ~/.gsd/gsd-config.json ~/.gsd/VERSION
+   ls ~/.claude/commands/gsd/
+   ls ~/.codex/prompts/gsd-*.md
    ```
 
 ---
@@ -63,7 +64,7 @@ rm -rf ~/.claude ~/.codex
 
 **Setup:**
 ```bash
-rm -rf ~/.claude ~/.codex
+rm -rf ~/.gsd ~/.claude ~/.codex
 ```
 
 **Steps:**
@@ -82,14 +83,14 @@ rm -rf ~/.claude ~/.codex
 
 4. **Expected output includes:**
    ```
-   Checking GSD installation at /Users/<you>/.claude (claude)...
+   Checking GSD installation at /Users/<you>/.gsd (claude)...
    [OK] gsd-config.json exists
    ...
    Installation is healthy!
 
    ---
 
-   Checking GSD installation at /Users/<you>/.codex (codex)...
+   Checking GSD installation at /Users/<you>/.gsd (codex)...
    [OK] gsd-config.json exists
    ...
    Installation is healthy!
@@ -107,7 +108,7 @@ rm -rf ~/.claude ~/.codex
 
 **Setup:**
 ```bash
-rm -rf ~/.claude ~/.codex
+rm -rf ~/.gsd ~/.claude ~/.codex
 ```
 
 **Steps:**
@@ -122,8 +123,9 @@ rm -rf ~/.claude ~/.codex
 
 3. **Verify:**
    ```bash
-   ls ~/.claude/gsd-config.json    # Should exist
-   ls ~/.codex/gsd-config.json     # Should fail: No such file
+   ls ~/.gsd/gsd-config.json         # Should exist
+   ls ~/.claude/commands/gsd/        # Should exist
+   ls ~/.codex/prompts/gsd-*.md      # Should fail: No such file
    ```
 
 4. Run doctor:
@@ -139,7 +141,7 @@ rm -rf ~/.claude ~/.codex
 
 **Setup:**
 ```bash
-rm -rf ~/.claude ~/.codex
+rm -rf ~/.gsd ~/.claude ~/.codex
 ```
 
 **Steps:**
@@ -153,10 +155,10 @@ rm -rf ~/.claude ~/.codex
 
 3. **Verify:**
    ```bash
-   ls ~/.codex/gsd-config.json     # Should exist
-   ls ~/.codex/prompts/gsd-help.md # Should exist
-   ls ~/.codex/AGENTS.md           # Should exist
-   ls ~/.claude/gsd-config.json    # Should fail: No such file
+   ls ~/.gsd/gsd-config.json         # Should exist
+   ls ~/.codex/prompts/gsd-help.md   # Should exist
+   ls ~/.codex/AGENTS.md             # Should exist
+   ls ~/.claude/commands/gsd/        # Should fail: No such file
    ```
 
 ---
@@ -174,13 +176,13 @@ rm -rf ~/.claude ~/.codex
 
 2. **Expected:** Checks both installations with summary:
    ```
-   Checking GSD installation at ~/.claude (claude)...
+   Checking GSD installation at ~/.gsd (claude)...
    ...
    Installation is healthy!
 
    ---
 
-   Checking GSD installation at ~/.codex (codex)...
+   Checking GSD installation at ~/.gsd (codex)...
    ...
    Installation is healthy!
 
@@ -189,7 +191,7 @@ rm -rf ~/.claude ~/.codex
    All 2 installations are healthy!
    ```
 
-**Note:** If you also have local installs (./.claude and/or ./.codex), doctor will include them too.
+**Note:** If you also have local installs (./.gsd), doctor will include them too.
 
 3. Run doctor for specific platform:
    ```bash
@@ -204,7 +206,7 @@ rm -rf ~/.claude ~/.codex
 
 **Setup:**
 ```bash
-rm -rf ~/.claude ~/.codex
+rm -rf ~/.gsd ~/.claude ~/.codex
 ```
 
 **Steps:**
@@ -254,8 +256,7 @@ rm -rf ~/.claude ~/.codex
 
 3. **Verify versions match:**
    ```bash
-   cat ~/.claude/gsd/VERSION
-   cat ~/.codex/gsd/VERSION
+   cat ~/.gsd/VERSION
    ```
 
 ---
@@ -279,7 +280,7 @@ rm -rf ~/.claude ~/.codex
 
 **Setup:**
 ```bash
-rm -rf ~/.claude ~/.codex
+rm -rf ~/.gsd ~/.claude ~/.codex
 ```
 
 **Steps:**
@@ -311,27 +312,29 @@ rm -rf ~/.claude ~/.codex
 2. **Expected:** Interactive prompt:
    ```
    GSD is installed for multiple platforms. Select which to uninstall:
-     1) claude (/Users/<you>/.claude)
-     2) codex (/Users/<you>/.codex)
+     1) claude (/Users/<you>/.gsd)
+     2) codex (/Users/<you>/.gsd)
      3) All
 
    Enter choice [1-3]:
    ```
 
-   **Note:** Paths reflect the actual install location (local or global).
+   **Note:** Paths reflect the `.gsd/` directory (local or global).
 
 3. Enter `1` to uninstall Claude only.
 
 4. **Expected:**
    ```
-   Uninstalling GSD from /Users/<you>/.claude...
+   Uninstalling GSD from /Users/<you>/.gsd...
    GSD uninstalled.
    ```
 
 5. **Verify:**
    ```bash
-   ls ~/.claude/gsd-config.json    # Should fail
-   ls ~/.codex/gsd-config.json     # Should exist
+   cat ~/.gsd/gsd-config.json | grep platforms
+   # Should show only ["codex"]
+   ls ~/.claude/commands/gsd/        # Should fail (removed)
+   ls ~/.codex/prompts/gsd-*.md      # Should exist
    ```
 
 ---
@@ -349,9 +352,9 @@ rm -rf ~/.claude ~/.codex
 
 2. **Expected:** Both uninstall without prompting:
    ```
-   Uninstalling GSD from /Users/<you>/.claude...
+   Uninstalling GSD from /Users/<you>/.gsd...
    GSD uninstalled.
-   Uninstalling GSD from /Users/<you>/.codex (Codex CLI)...
+   Uninstalling GSD from /Users/<you>/.gsd (Codex CLI)...
    GSD uninstalled.
    ```
 
@@ -359,8 +362,9 @@ rm -rf ~/.claude ~/.codex
 
 3. **Verify:**
    ```bash
-   ls ~/.claude/gsd-config.json    # Should fail
-   ls ~/.codex/gsd-config.json     # Should fail
+   ls ~/.gsd/gsd-config.json    # Should fail (removed)
+   ls ~/.claude/commands/gsd/   # Should fail
+   ls ~/.codex/prompts/         # Should fail
    ```
 
 ---
@@ -380,8 +384,10 @@ rm -rf ~/.claude ~/.codex
 
 3. **Verify:**
    ```bash
-   ls ~/.claude/gsd-config.json    # Should exist
-   ls ~/.codex/gsd-config.json     # Should fail
+   cat ~/.gsd/gsd-config.json | grep platforms
+   # Should show only ["claude"]
+   ls ~/.claude/commands/gsd/        # Should exist
+   ls ~/.codex/prompts/gsd-*.md      # Should fail
    ```
 
 ---
@@ -390,7 +396,7 @@ rm -rf ~/.claude ~/.codex
 
 **Setup:** Only Claude installed.
 ```bash
-rm -rf ~/.claude ~/.codex
+rm -rf ~/.gsd ~/.claude ~/.codex
 ./gsd install --platform=claude
 ```
 
@@ -409,7 +415,7 @@ rm -rf ~/.claude ~/.codex
 
 **Setup:**
 ```bash
-rm -rf ~/.claude ~/.codex
+rm -rf ~/.gsd ~/.claude ~/.codex
 ```
 
 **Steps:**
@@ -423,8 +429,9 @@ rm -rf ~/.claude ~/.codex
 
 3. **Verify:**
    ```bash
-   ls ~/.claude/gsd-config.json    # Should exist
-   ls ~/.codex/gsd-config.json     # Should fail
+   ls ~/.gsd/gsd-config.json         # Should exist
+   ls ~/.claude/commands/gsd/        # Should exist
+   ls ~/.codex/prompts/gsd-*.md      # Should fail
    ```
 
 ---
@@ -528,31 +535,7 @@ rm -rf ~/.claude ~/.codex
    ./gsd --version
    ```
 
-2. **Expected:** Version string like `gsd 0.2.0`
-
----
-
-## Edge Cases
-
-### Invalid Platform Flag
-```bash
-./gsd install --platform=vscode
-```
-**Expected:** Error message and exit code 1.
-
-### Uninstall Non-Existent Platform
-```bash
-rm -rf ~/.codex
-./gsd uninstall --platform=codex
-```
-**Expected:** Error message about no installation found.
-
-### Doctor on Corrupted Installation
-```bash
-rm ~/.claude/gsd/VERSION
-./gsd doctor --platform=claude
-```
-**Expected:** Reports "VERSION file missing" as an issue.
+2. **Expected:** Version string like `gsd 0.3.0`
 
 ---
 
@@ -560,7 +543,7 @@ rm ~/.claude/gsd/VERSION
 
 **Setup:** Install both local and global for Claude.
 ```bash
-rm -rf ~/.claude ./.claude
+rm -rf ~/.gsd ./.gsd ~/.claude ./.claude
 ./gsd install --global --platform=claude
 ./gsd install --local --platform=claude
 ```
@@ -574,12 +557,12 @@ rm -rf ~/.claude ./.claude
 
 2. **Expected:** Two entries, one for each install path:
    ```
-   Checking GSD installation at /Users/<you>/.claude (claude)...
+   Checking GSD installation at /Users/<you>/.gsd (claude)...
    ...
 
    ---
 
-   Checking GSD installation at /path/to/project/.claude (claude)...
+   Checking GSD installation at /path/to/project/.gsd (claude)...
    ...
 
    ===
@@ -596,27 +579,155 @@ rm -rf ~/.claude ./.claude
 
 ---
 
-## Scenario 20: GSD_CONFIG_DIR Override
+## Scenario 20: Custom Config Directory
 
 **Setup:** Custom config directory containing a valid gsd-config.json.
 
 **Steps:**
 
-1. Set override:
+1. Install to a custom directory:
    ```bash
-   export GSD_CONFIG_DIR="/custom/gsd/config"
+   ./gsd install --config-dir /tmp/test-gsd --platform=claude
    ```
 
-2. Run doctor:
+2. Run doctor with `--config-dir`:
    ```bash
-   ./gsd doctor --config-dir "$GSD_CONFIG_DIR"
+   ./gsd doctor --config-dir /tmp/test-gsd
    ```
 
 3. **Expected:** Only the specified directory is checked.
 
-**Note:** `GSD_CONFIG_DIR` is ignored for platform-specific commands if the config’s platform doesn’t match the requested platform.
+4. Test the env var (same behavior, lower priority than flag):
+   ```bash
+   export GSD_CONFIG_DIR="/tmp/test-gsd"
+   ./gsd doctor
+   ```
+
+5. **Expected:** Same result. The env var is used when `--config-dir` is not provided.
+
+**Note:** Both `--config-dir` and `GSD_CONFIG_DIR` point to a `.gsd/` directory. Tool-specific directories are inferred from the install type. The env var is not listed in `--help` output but is part of the config resolution chain.
 
 **Note:** `--config-dir` cannot be combined with `--platform=both`. If `gsd-config.json` is missing, GSD will infer the platform from installed files; provide `--platform` if inference is ambiguous.
+
+---
+
+## Scenario 21: v0.2 → v0.3 Migration
+
+**Setup:** Simulate a v0.2 install (config in tool directory, not `.gsd/`).
+```bash
+rm -rf ~/.gsd ~/.claude ~/.codex
+mkdir -p ~/.claude
+cat > ~/.claude/gsd-config.json << 'EOF'
+{
+  "version": "0.2.0",
+  "platform": "claude",
+  "config_dir": "/Users/you/.claude",
+  "installed_at": "2026-01-19T00:00:00Z"
+}
+EOF
+```
+
+**Steps:**
+
+1. Run install over the old layout:
+   ```bash
+   ./gsd install --platform=claude
+   ```
+
+2. **Expected:**
+   - Shared resources install to `~/.gsd/` (new location)
+   - New `gsd-config.json` written to `~/.gsd/` with `gsd_dir` and `platforms` fields
+   - Old `~/.claude/gsd-config.json` is superseded (new config takes precedence in resolution)
+   - Statusline hook updated to point to new `~/.gsd/` path
+
+3. **Verify:**
+   ```bash
+   cat ~/.gsd/gsd-config.json | grep gsd_dir    # Should show ~/.gsd
+   cat ~/.gsd/gsd-config.json | grep platforms   # Should show ["claude"]
+   ./gsd doctor
+   ```
+
+4. **Expected:** Doctor reports healthy installation at `~/.gsd`.
+
+---
+
+## Scenario 22: Local and Global Install Conflict
+
+**Setup:**
+```bash
+rm -rf ~/.gsd ./.gsd ~/.claude ./.claude
+```
+
+**Steps:**
+
+1. Install globally:
+   ```bash
+   ./gsd install --global --platform=claude
+   ```
+
+2. Install locally in same project:
+   ```bash
+   ./gsd install --local --platform=claude
+   ```
+
+3. Run doctor from the project directory:
+   ```bash
+   ./gsd doctor
+   ```
+
+4. **Expected:** Two separate installations reported:
+   ```
+   Checking GSD installation at /Users/<you>/.gsd (claude)...
+   ...
+   Installation is healthy!
+
+   ---
+
+   Checking GSD installation at /path/to/project/.gsd (claude)...
+   ...
+   Installation is healthy!
+
+   ===
+
+   All 2 installations are healthy!
+   ```
+
+5. Run update:
+   ```bash
+   ./gsd update
+   ```
+
+6. **Expected:** Both installations are re-installed.
+
+7. Uninstall only local:
+   ```bash
+   ./gsd uninstall --local --platform=claude
+   ```
+
+8. **Expected:** Only `./.gsd` removed; `~/.gsd` remains intact.
+
+---
+
+## Edge Cases
+
+### Invalid Platform Flag
+```bash
+./gsd install --platform=vscode
+```
+**Expected:** Error message and exit code 1.
+
+### Uninstall Non-Existent Platform
+```bash
+./gsd uninstall --platform=codex
+```
+**Expected:** Error message about no installation found.
+
+### Doctor on Corrupted Installation
+```bash
+rm ~/.gsd/VERSION
+./gsd doctor --platform=claude
+```
+**Expected:** Reports "VERSION file missing" as an issue.
 
 ---
 
@@ -631,3 +742,5 @@ rm -rf ~/.claude ./.claude
 | --platform=both | Install 2 | - | - | Uninstall 2 |
 | --all flag | - | - | - | Uninstall all |
 | Non-interactive | Default Claude | - | - | Error if multiple |
+| v0.2 → v0.3 migration | Over-install | Check 1 | - | - |
+| Local + global | Install 2 | Check 2 | Update 2 | Per-scope |
