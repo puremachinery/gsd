@@ -22,3 +22,7 @@ installer/tests/test_statusline
 installer/tests/test_toml
 installer/tests/test_update
 installer/tests/test_cli_integration
+
+# AI Review System
+.review_state.yaml
+.review_history/
