@@ -13,18 +13,18 @@ type
   GsdConfig* = object
     version*: string
     installType*: InstallType
-    platform*: Platform
-    configDir*: string
+    platforms*: seq[Platform]
+    gsdDir*: string
     installedAt*: string
 
   InstalledConfig* = object
     platform*: Platform
-    dir*: string
+    dir*: string  ## the .gsd/ directory
 
 proc loadConfig*(configDir: string): Option[GsdConfig]
 
 const
-  Version* = "0.2.0"
+  Version* = "0.3.0"
   ConfigFileName* = "gsd-config.json"
   GsdDirName* = "gsd"
   CacheDirName* = "cache"
@@ -67,12 +67,12 @@ proc getEnvConfigDir(): Option[string] =
     return some(expanded)
   return none(string)
 
-proc inferInstallType*(dir: string, p: Platform): InstallType =
-  ## Infer install type from a config directory path
-  let expanded = expandPath(dir)
-  if expanded == platform.getLocalConfigDir(p):
+proc inferInstallType*(dir: string): InstallType =
+  ## Infer install type from a .gsd/ directory path
+  let resolved = resolvedPath(expandPath(dir))
+  if resolved == resolvedPath(platform.getLocalGsdDir()):
     return itLocal
-  if expanded == platform.getGlobalConfigDir(p):
+  if resolved == resolvedPath(platform.getGlobalGsdDir()):
     return itGlobal
   return itCustom
 
@@ -107,29 +107,28 @@ proc inferPlatformFromDir*(configDir: string): Option[Platform] =
   return none(Platform)
 
 proc getLocalConfigDir*(): string =
-  ## Returns ./.claude (Claude Code default)
-  result = getCurrentDir() / ".claude"
+  ## Returns ./.gsd
+  result = platform.getLocalGsdDir()
 
 proc getGlobalConfigDir*(): string =
-  ## Returns ~/.claude (Claude Code default)
-  result = getHomeDir() / ".claude"
+  ## Returns ~/.gsd
+  result = platform.getGlobalGsdDir()
 
 proc getLocalConfigDirFor*(p: Platform): string =
-  ## Returns ./.<platform-config-dir>
+  ## Returns ./.<platform-config-dir> (tool-specific dir)
   result = platform.getLocalConfigDir(p)
 
 proc getGlobalConfigDirFor*(p: Platform): string =
-  ## Returns ~/.<platform-config-dir>
+  ## Returns ~/.<platform-config-dir> (tool-specific dir)
   result = platform.getGlobalConfigDir(p)
 
 proc findConfigDir*(explicit: string = ""): Option[string] =
-  ## Resolve config directory in priority order:
+  ## Resolve .gsd/ config directory in priority order:
   ## 1. Explicit --config-dir flag
   ## 2. GSD_CONFIG_DIR env var
-  ## 3. Local ./.claude/gsd-config.json
-  ## 4. Global ~/.claude/gsd-config.json
-  ## 5. Local ./.codex/gsd-config.json
-  ## 6. Global ~/.codex/gsd-config.json
+  ## 3. Local ./.gsd/gsd-config.json
+  ## 4. Global ~/.gsd/gsd-config.json
+  ## 5. Legacy fallback: .claude/ or .codex/ (v0.2 compat)
 
   # Explicit takes priority
   if explicit.len > 0:
@@ -143,37 +142,29 @@ proc findConfigDir*(explicit: string = ""): Option[string] =
   if envDir.isSome:
     return envDir
 
-  # Check local first
+  # v0.3: Check .gsd/ (local then global)
   let localDir = getLocalConfigDir()
   let localConfig = localDir / ConfigFileName
   if fileExists(localConfig):
     return some(localDir)
 
-  # Check global
   let globalDir = getGlobalConfigDir()
   let globalConfig = globalDir / ConfigFileName
   if fileExists(globalConfig):
     return some(globalDir)
 
-  # Check Codex (if Claude not found)
-  let codexLocal = platform.getLocalConfigDir(pCodexCli)
-  let codexLocalConfig = codexLocal / ConfigFileName
-  if fileExists(codexLocalConfig):
-    return some(codexLocal)
-
-  let codexGlobal = platform.getGlobalConfigDir(pCodexCli)
-  let codexGlobalConfig = codexGlobal / ConfigFileName
-  if fileExists(codexGlobalConfig):
-    return some(codexGlobal)
+  # v0.2 legacy fallback: Check tool dirs
+  for p in [pClaudeCode, pCodexCli]:
+    for dir in [platform.getLocalConfigDir(p), platform.getGlobalConfigDir(p)]:
+      if fileExists(dir / ConfigFileName):
+        return some(dir)
 
   return none(string)
 
 proc findConfigDir*(p: Platform, explicit: string = ""): Option[string] =
-  ## Resolve config directory for a specific platform in priority order:
-  ## 1. Explicit --config-dir flag
-  ## 2. GSD_CONFIG_DIR env var
-  ## 3. Local ./.<platform>/gsd-config.json
-  ## 4. Global ~/.<platform>/gsd-config.json
+  ## Resolve .gsd/ config directory that includes a given platform.
+  ## v0.3: checks .gsd/gsd-config.json for platforms array
+  ## v0.2 fallback: checks tool-specific dirs
 
   # Explicit takes priority
   if explicit.len > 0:
@@ -186,20 +177,23 @@ proc findConfigDir*(p: Platform, explicit: string = ""): Option[string] =
   let envDir = getEnvConfigDir()
   if envDir.isSome:
     let cfg = loadConfig(envDir.get())
-    if cfg.isSome and cfg.get().platform == p:
+    if cfg.isSome and p in cfg.get().platforms:
       return envDir
-    if cfg.isNone:
-      let inferred = inferPlatformFromDir(envDir.get())
-      if inferred.isSome and inferred.get() == p:
-        return envDir
 
-  # Check local first
+  # v0.3: Check .gsd/ (local then global)
+  for gsdDir in [platform.getLocalGsdDir(), platform.getGlobalGsdDir()]:
+    let configPath = gsdDir / ConfigFileName
+    if fileExists(configPath):
+      let cfg = loadConfig(gsdDir)
+      if cfg.isSome and p in cfg.get().platforms:
+        return some(gsdDir)
+
+  # v0.2 fallback: Check tool-specific dirs
   let localDir = platform.getLocalConfigDir(p)
   let localConfig = localDir / ConfigFileName
   if fileExists(localConfig):
     return some(localDir)
 
-  # Check global
   let globalDir = platform.getGlobalConfigDir(p)
   let globalConfig = globalDir / ConfigFileName
   if fileExists(globalConfig):
@@ -209,47 +203,57 @@ proc findConfigDir*(p: Platform, explicit: string = ""): Option[string] =
 
 proc addInstalledConfig(installs: var seq[InstalledConfig], p: Platform, dir: string) =
   for item in installs:
-    if item.dir == dir:
+    if item.platform == p and item.dir == dir:
       return
   installs.add(InstalledConfig(platform: p, dir: dir))
 
 proc listInstalledConfigs*(): seq[InstalledConfig] =
-  ## List all detected installations (local/global + env var if valid)
+  ## List all detected installations
+  ## v0.3: reads platforms from .gsd/gsd-config.json
+  ## v0.2 fallback: checks each tool dir
   result = @[]
 
-  for p in [pClaudeCode, pCodexCli]:
-    for dir in [platform.getLocalConfigDir(p), platform.getGlobalConfigDir(p)]:
-      if fileExists(dir / ConfigFileName):
-        addInstalledConfig(result, p, dir)
+  # v0.3: Check .gsd/ (local then global)
+  for gsdDir in [platform.getLocalGsdDir(), platform.getGlobalGsdDir()]:
+    if fileExists(gsdDir / ConfigFileName):
+      let cfg = loadConfig(gsdDir)
+      if cfg.isSome:
+        for p in cfg.get().platforms:
+          addInstalledConfig(result, p, gsdDir)
 
+  # v0.2 fallback: Check each tool dir
+  if result.len == 0:
+    for p in [pClaudeCode, pCodexCli]:
+      for dir in [platform.getLocalConfigDir(p), platform.getGlobalConfigDir(p)]:
+        if fileExists(dir / ConfigFileName):
+          addInstalledConfig(result, p, dir)
+
+  # Environment variable override
   let envDir = getEnvConfigDir()
   if envDir.isSome:
     let cfg = loadConfig(envDir.get())
     if cfg.isSome:
-      addInstalledConfig(result, cfg.get().platform, envDir.get())
-    else:
-      let inferred = inferPlatformFromDir(envDir.get())
-      if inferred.isSome:
-        addInstalledConfig(result, inferred.get(), envDir.get())
+      for p in cfg.get().platforms:
+        addInstalledConfig(result, p, envDir.get())
 
 proc findVersionFile*(explicit: string = ""): Option[string] =
-  ## Find VERSION file, checking local then global
+  ## Find VERSION file in .gsd/ directory
   ## Returns the path if found
 
   if explicit.len > 0:
     let expanded = expandPath(explicit)
-    let versionPath = expanded / GsdDirName / VersionFileName
+    let versionPath = expanded / VersionFileName
     if fileExists(versionPath):
       return some(versionPath)
     return none(string)
 
-  # Check local first
-  let localVersion = getLocalConfigDir() / GsdDirName / VersionFileName
+  # Check local .gsd/ first
+  let localVersion = getLocalConfigDir() / VersionFileName
   if fileExists(localVersion):
     return some(localVersion)
 
-  # Check global
-  let globalVersion = getGlobalConfigDir() / GsdDirName / VersionFileName
+  # Check global ~/.gsd/
+  let globalVersion = getGlobalConfigDir() / VersionFileName
   if fileExists(globalVersion):
     return some(globalVersion)
 
@@ -271,11 +275,13 @@ proc isLocalInstall*(explicit: string = ""): bool =
   if explicit.len > 0:
     return false  # Explicit is treated as custom
 
-  let localVersion = getLocalConfigDir() / GsdDirName / VersionFileName
+  let localVersion = getLocalConfigDir() / VersionFileName
   return fileExists(localVersion)
 
 proc loadConfig*(configDir: string): Option[GsdConfig] =
   ## Load gsd-config.json from specified directory
+  ## Handles both v0.3 format (platforms array, gsd_dir) and
+  ## v0.2 format (platform string, config_dir) for backward compat
   let configPath = configDir / ConfigFileName
   if not fileExists(configPath):
     return none(GsdConfig)
@@ -286,7 +292,6 @@ proc loadConfig*(configDir: string): Option[GsdConfig] =
 
     var config = GsdConfig()
     config.version = json.getOrDefault("version").getStr("0.0.0")
-    config.configDir = json.getOrDefault("config_dir").getStr(configDir)
     config.installedAt = json.getOrDefault("installed_at").getStr("")
 
     let installTypeStr = json.getOrDefault("install_type").getStr("global")
@@ -295,27 +300,52 @@ proc loadConfig*(configDir: string): Option[GsdConfig] =
     of "custom": config.installType = itCustom
     else: config.installType = itGlobal
 
-    # Parse platform (default to Claude Code for backward compatibility)
-    let platformStr = json.getOrDefault("platform").getStr("claude")
-    try:
-      config.platform = parsePlatform(platformStr)
-    except ValueError:
-      config.platform = pClaudeCode
+    # v0.3 format: gsd_dir and platforms array
+    if json.hasKey("gsd_dir"):
+      config.gsdDir = json["gsd_dir"].getStr(configDir)
+    elif json.hasKey("config_dir"):
+      # v0.2 fallback
+      config.gsdDir = json["config_dir"].getStr(configDir)
+    else:
+      config.gsdDir = configDir
+
+    # v0.3 format: platforms array
+    if json.hasKey("platforms") and json["platforms"].kind == JArray:
+      config.platforms = @[]
+      for item in json["platforms"]:
+        let platStr = item.getStr("")
+        try:
+          config.platforms.add(parsePlatform(platStr))
+        except ValueError:
+          discard
+    elif json.hasKey("platform"):
+      # v0.2 fallback: single platform string
+      let platformStr = json["platform"].getStr("claude")
+      try:
+        config.platforms = @[parsePlatform(platformStr)]
+      except ValueError:
+        config.platforms = @[pClaudeCode]
+    else:
+      config.platforms = @[pClaudeCode]
 
     return some(config)
   except JsonParsingError, IOError:
     return none(GsdConfig)
 
 proc saveConfig*(config: GsdConfig, configDir: string): bool =
-  ## Save gsd-config.json to specified directory
+  ## Save gsd-config.json to specified directory (v0.3 format)
   let configPath = configDir / ConfigFileName
 
   try:
+    var platformsArr = newJArray()
+    for p in config.platforms:
+      platformsArr.add(%($p))
+
     let json = %*{
       "version": config.version,
       "install_type": $config.installType,
-      "platform": $config.platform,
-      "config_dir": config.configDir,
+      "gsd_dir": config.gsdDir,
+      "platforms": platformsArr,
       "installed_at": config.installedAt
     }
     writeFile(configPath, json.pretty())
@@ -323,10 +353,10 @@ proc saveConfig*(config: GsdConfig, configDir: string): bool =
   except IOError:
     return false
 
-proc getGsdCacheDir*(configDir: string): string =
-  ## Get cache directory for a config dir
-  result = configDir / CacheDirName
+proc getGsdCacheDir*(gsdDir: string): string =
+  ## Get cache directory within .gsd/
+  result = gsdDir / CacheDirName
 
-proc getGsdDir*(configDir: string): string =
-  ## Get gsd resource directory for a config dir
-  result = configDir / GsdDirName
+proc getGsdDir*(gsdDir: string): string =
+  ## Get .gsd/ resource directory (returns gsdDir directly)
+  result = gsdDir

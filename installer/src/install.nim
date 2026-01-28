@@ -1,7 +1,7 @@
 ## GSD Installation logic
 ## Handles file copying, settings.json merging, and cleanup
 
-import std/[os, json, options, strutils, times, algorithm]
+import std/[os, json, options, strutils, times, algorithm, sequtils]
 import config, platform, toml
 
 const
@@ -228,10 +228,10 @@ proc mergeStatusline*(existing: JsonNode, gsdStatusline: JsonNode,
     return (%*{"type": "command", "command": currentCmd}, false)
   return (current, false)
 
-proc createGsdHooks(gsdBinaryPath, configDir: string): JsonNode =
+proc createGsdHooks(gsdBinaryPath, gsdDir: string): JsonNode =
   ## Create the GSD hook definitions in Claude Code's expected format
   ## Format: { "EventName": [{ "matcher": "...", "hooks": [{ "type": "command", "command": "..." }] }] }
-  ## Passes --config-dir to ensure correct cache location for custom installs
+  ## Passes --config-dir pointing to .gsd/ directory
   ## Both paths are quoted to handle spaces in paths
   result = %*{
     "SessionStart": [
@@ -240,25 +240,25 @@ proc createGsdHooks(gsdBinaryPath, configDir: string): JsonNode =
         "hooks": [
           {
             "type": "command",
-            "command": "\"" & gsdBinaryPath & "\" check-update --config-dir \"" & configDir & "\" #gsd"
+            "command": "\"" & gsdBinaryPath & "\" check-update --config-dir \"" & gsdDir & "\" #gsd"
           }
         ]
       }
     ]
   }
 
-proc createStatuslineConfig(gsdBinaryPath, configDir: string): JsonNode =
+proc createStatuslineConfig(gsdBinaryPath, gsdDir: string): JsonNode =
   ## Create the statusLine config in Claude Code's expected format
-  ## Passes --config-dir to ensure correct cache location for custom installs
+  ## Passes --config-dir pointing to .gsd/ directory
   ## Both paths are quoted to handle spaces in paths
   result = %*{
     "type": "command",
-    "command": "\"" & gsdBinaryPath & "\" statusline --config-dir \"" & configDir & "\" #gsd"
+    "command": "\"" & gsdBinaryPath & "\" statusline --config-dir \"" & gsdDir & "\" #gsd"
   }
 
-proc writeVersionFile(configDir: string): bool =
-  ## Write VERSION file
-  let versionPath = configDir / GsdDirName / VersionFileName
+proc writeVersionFile(gsdDir: string): bool =
+  ## Write VERSION file to .gsd/ directory
+  let versionPath = gsdDir / VersionFileName
   try:
     writeFile(versionPath, Version)
     return true
@@ -336,36 +336,21 @@ const
     "gsd-planner.md"
   ]
 
-proc rewritePathReferences*(content, installType, configDir: string, p: Platform = pClaudeCode): string =
-  ## Rewrite ~/.claude/gsd/ references based on install type and platform
+proc rewritePathReferences*(content, installType, gsdDir: string): string =
+  ## Rewrite @~/.gsd/ references based on install type
   ## For local installs, use relative paths
-  ## For custom installs, use the actual custom config path
-  ## For global installs, use platform-specific path (e.g., ~/.codex for Codex)
-  let platformPrefix = p.getPathPrefix()  # e.g., "~/.claude" or "~/.codex"
-  let platformDirName = p.getConfigDirName()  # e.g., ".claude" or ".codex"
-
+  ## For custom installs, use the actual custom gsd path
+  ## For global installs, no rewriting needed (source form is correct)
   if installType == "local":
-    # For local installs, use relative platform-specific path
-    result = content.replace("@~/.claude/gsd/", "@" & platformDirName & "/gsd/")
-    result = result.replace("@~/.claude/", "@" & platformDirName & "/")
-    # Also handle non-@ references in prose/documentation
-    result = result.replace("~/.claude/gsd/", platformDirName & "/gsd/")
-    result = result.replace("~/.claude/", platformDirName & "/")
-  elif installType == "custom" and configDir.len > 0:
-    # For custom installs, rewrite to the actual custom path
-    result = content.replace("@~/.claude/gsd/", "@" & configDir & "/gsd/")
-    result = result.replace("@~/.claude/", "@" & configDir & "/")
-    # Also handle non-@ references in prose/documentation
-    result = result.replace("~/.claude/gsd/", configDir & "/gsd/")
-    result = result.replace("~/.claude/", configDir & "/")
+    result = content.replace("@~/.gsd/", "@.gsd/")
+    result = result.replace("~/.gsd/", ".gsd/")
+  elif installType == "custom" and gsdDir.len > 0:
+    result = content.replace("@~/.gsd/", "@" & gsdDir & "/")
+    result = result.replace("~/.gsd/", gsdDir & "/")
   else:
-    # For global installs, use platform-specific path
-    result = content.replace("@~/.claude/gsd/", "@" & platformPrefix & "/gsd/")
-    result = result.replace("@~/.claude/", "@" & platformPrefix & "/")
-    result = result.replace("~/.claude/gsd/", platformPrefix & "/gsd/")
-    result = result.replace("~/.claude/", platformPrefix & "/")
+    result = content  # No rewriting for global
 
-proc copyAndRewriteDir(src, dest, installType, configDir: string, p: Platform, verbose: bool): bool =
+proc copyAndRewriteDir(src, dest, installType, gsdDir: string, verbose: bool): bool =
   ## Copy directory, rewriting path references in .md files
   try:
     createDir(dest)
@@ -376,14 +361,14 @@ proc copyAndRewriteDir(src, dest, installType, configDir: string, p: Platform, v
         if path.endsWith(".md"):
           # Rewrite path references in markdown files
           let content = readFile(path)
-          let rewritten = rewritePathReferences(content, installType, configDir, p)
+          let rewritten = rewritePathReferences(content, installType, gsdDir)
           writeFile(destPath, rewritten)
           log("Processed: " & extractFilename(path), verbose)
         else:
           copyFile(path, destPath)
           log("Copied: " & extractFilename(path), verbose)
       of pcDir:
-        if not copyAndRewriteDir(path, destPath, installType, configDir, p, verbose):
+        if not copyAndRewriteDir(path, destPath, installType, gsdDir, verbose):
           return false
       else:
         discard
@@ -395,12 +380,12 @@ proc copyAndRewriteDir(src, dest, installType, configDir: string, p: Platform, v
     stderr.writeLine "Error processing file: ", e.msg
     return false
 
-proc copyResourceDirWithRewrite(src, dest, installType, configDir: string, p: Platform, verbose: bool): bool =
+proc copyResourceDirWithRewrite(src, dest, installType, gsdDir: string, verbose: bool): bool =
   ## Safely copy a directory using atomic rename, with path rewriting
   let tempDest = dest & ".tmp." & $epochTime().int
 
   # Copy to temp location with rewriting
-  if not copyAndRewriteDir(src, tempDest, installType, configDir, p, verbose):
+  if not copyAndRewriteDir(src, tempDest, installType, gsdDir, verbose):
     try:
       removeDir(tempDest)
     except OSError:
@@ -435,7 +420,44 @@ proc copyResourceDirWithRewrite(src, dest, installType, configDir: string, p: Pl
       discard
     return false
 
-proc installGsdAgents(sourceDir, destDir, installType, configDir: string, p: Platform, verbose: bool): bool =
+proc installSharedResources(sourceGsdDir, destGsdDir, installTypeStr, gsdDir: string, verbose: bool): bool =
+  ## Install shared resources from gsd/ source to .gsd/ destination
+  ## Copies each subdirectory atomically without replacing the .gsd/ root,
+  ## so gsd-config.json, VERSION, and cache/ are preserved.
+  if not dirExists(sourceGsdDir):
+    return true
+
+  if not dirExists(destGsdDir):
+    try:
+      createDir(destGsdDir)
+    except OSError as e:
+      stderr.writeLine "Error creating .gsd/ directory: ", e.msg
+      return false
+
+  for kind, path in walkDir(sourceGsdDir):
+    let name = extractFilename(path)
+    let dest = destGsdDir / name
+    case kind
+    of pcDir:
+      if not copyResourceDirWithRewrite(path, dest, installTypeStr, gsdDir, verbose):
+        return false
+    of pcFile:
+      try:
+        if path.endsWith(".md"):
+          let content = readFile(path)
+          let rewritten = rewritePathReferences(content, installTypeStr, gsdDir)
+          writeFile(dest, rewritten)
+        else:
+          copyFile(path, dest)
+        log("Installed: " & name, verbose)
+      except IOError as e:
+        stderr.writeLine "Error copying file: ", e.msg
+        return false
+    else:
+      discard
+  return true
+
+proc installGsdAgents(sourceDir, destDir, installType, gsdDir: string, verbose: bool): bool =
   ## Install only GSD agent files, preserving user's custom agents
   ## This merges rather than replacing the entire directory
   ## Path references are rewritten for local/custom installs
@@ -453,7 +475,7 @@ proc installGsdAgents(sourceDir, destDir, installType, configDir: string, p: Pla
       try:
         # Agent files are markdown - rewrite path references
         let content = readFile(srcPath)
-        let rewritten = rewritePathReferences(content, installType, configDir, p)
+        let rewritten = rewritePathReferences(content, installType, gsdDir)
         writeFile(destPath, rewritten)
         log("Installed: " & agentFile, verbose)
       except OSError as e:
@@ -465,7 +487,7 @@ proc installGsdAgents(sourceDir, destDir, installType, configDir: string, p: Pla
 
   return true
 
-proc generateAgentsMd*(agentFiles: seq[string], destPath: string, installType, configDir: string, p: Platform): bool =
+proc generateAgentsMd*(agentFiles: seq[string], destPath: string, installType, gsdDir: string): bool =
   ## Generate a single AGENTS.md by concatenating individual agent files
   ## Used for Codex CLI which expects agents in a single file
   try:
@@ -480,7 +502,7 @@ proc generateAgentsMd*(agentFiles: seq[string], destPath: string, installType, c
       if fileExists(agentPath):
         let filename = extractFilename(agentPath)
         let agentContent = readFile(agentPath)
-        let rewritten = rewritePathReferences(agentContent, installType, configDir, p)
+        let rewritten = rewritePathReferences(agentContent, installType, gsdDir)
         content.add "---\n\n"
         content.add "## " & filename.replace(".md", "") & "\n\n"
         content.add rewritten
@@ -492,7 +514,7 @@ proc generateAgentsMd*(agentFiles: seq[string], destPath: string, installType, c
     stderr.writeLine "Error generating AGENTS.md: ", e.msg
     return false
 
-proc installCodexPrompts(sourceDir, destDir, installType, configDir: string, p: Platform, verbose: bool): bool =
+proc installCodexPrompts(sourceDir, destDir, installType, gsdDir: string, verbose: bool): bool =
   ## Install commands as Codex prompts (gsd-*.md files)
   ## Codex uses ~/.codex/prompts/ for custom commands
   if not dirExists(destDir):
@@ -515,7 +537,7 @@ proc installCodexPrompts(sourceDir, destDir, installType, configDir: string, p: 
       let destPath = destDir / destFilename
       try:
         let content = readFile(path)
-        let rewritten = rewritePathReferences(content, installType, configDir, p)
+        let rewritten = rewritePathReferences(content, installType, gsdDir)
         writeFile(destPath, rewritten)
         log("Installed prompt: " & destFilename, verbose)
       except IOError as e:
@@ -525,27 +547,37 @@ proc installCodexPrompts(sourceDir, destDir, installType, configDir: string, p: 
   return true
 
 proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
-  ## Installation procedure for Codex CLI
+  ## Installation procedure for Codex CLI (two-phase)
+  ## Phase A: Shared resources → .gsd/
+  ## Phase B: Tool-specific files → .codex/
 
-  let configDir = if opts.configDir.len > 0:
+  # Resolve gsdDir (.gsd/ directory)
+  let gsdDir = if opts.configDir.len > 0:
     expandPath(opts.configDir)
   elif opts.installType == itLocal:
+    platform.getLocalGsdDir()
+  else:
+    platform.getGlobalGsdDir()
+
+  # Resolve toolDir (.codex/ directory)
+  let toolDir = if opts.installType == itLocal:
     platform.getLocalConfigDir(opts.platform)
   else:
     platform.getGlobalConfigDir(opts.platform)
 
-  result.configDir = configDir
+  result.configDir = gsdDir
 
-  # Create config directory if needed
-  if not dirExists(configDir):
-    try:
-      createDir(configDir)
-    except OSError as e:
-      result.success = false
-      result.message = "Failed to create config directory: " & e.msg
-      return
+  # Create directories if needed
+  for dir in [gsdDir, toolDir]:
+    if not dirExists(dir):
+      try:
+        createDir(dir)
+      except OSError as e:
+        result.success = false
+        result.message = "Failed to create directory: " & e.msg
+        return
 
-  echo "Installing GSD to ", configDir, " (Codex CLI)..."
+  echo "Installing GSD to ", gsdDir, " + ", toolDir, " (Codex CLI)..."
 
   # Determine install type for path rewriting
   let installTypeStr = if opts.configDir.len > 0:
@@ -555,25 +587,40 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
   else:
     "global"
 
-  # 1. Copy gsd/ resources (same as Claude Code)
-  let gsdDir = configDir / GsdDirName
+  # Phase A: Shared resources to .gsd/
   let gsdSource = sourceDir / "gsd"
   if dirExists(gsdSource):
-    if not copyResourceDirWithRewrite(gsdSource, gsdDir, installTypeStr, configDir, opts.platform, opts.verbose):
+    if not installSharedResources(gsdSource, gsdDir, installTypeStr, gsdDir, opts.verbose):
       result.success = false
       result.message = "Failed to copy gsd resources"
       return
-    echo "  Installed gsd resources"
+    echo "  Installed shared resources to ", gsdDir
 
-  # 2. Install commands as prompts (gsd-*.md)
-  let promptsDir = configDir / CodexPromptsDir
-  if not installCodexPrompts(sourceDir, promptsDir, installTypeStr, configDir, opts.platform, opts.verbose):
+  # Write VERSION to .gsd/
+  if not writeVersionFile(gsdDir):
+    result.success = false
+    result.message = "Failed to write VERSION file"
+    return
+
+  # Create cache in .gsd/
+  let cacheDir = getGsdCacheDir(gsdDir)
+  if not dirExists(cacheDir):
+    try:
+      createDir(cacheDir)
+    except OSError:
+      discard  # Non-fatal
+
+  # Phase B: Tool-specific files to .codex/
+
+  # Install commands as prompts (gsd-*.md)
+  let promptsDir = toolDir / CodexPromptsDir
+  if not installCodexPrompts(sourceDir, promptsDir, installTypeStr, gsdDir, opts.verbose):
     result.success = false
     result.message = "Failed to install prompts"
     return
   echo "  Installed prompts"
 
-  # 3. Generate AGENTS.md from individual agent files
+  # Generate AGENTS.md from individual agent files
   let agentsSource = sourceDir / "agents"
   if dirExists(agentsSource):
     var agentPaths: seq[string] = @[]
@@ -582,21 +629,15 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
       if fileExists(agentPath):
         agentPaths.add(agentPath)
 
-    let agentsMdPath = configDir / CodexAgentsMdFile
-    if not generateAgentsMd(agentPaths, agentsMdPath, installTypeStr, configDir, opts.platform):
+    let agentsMdPath = toolDir / CodexAgentsMdFile
+    if not generateAgentsMd(agentPaths, agentsMdPath, installTypeStr, gsdDir):
       result.success = false
       result.message = "Failed to generate AGENTS.md"
       return
     echo "  Generated AGENTS.md"
 
-  # 4. Write VERSION file
-  if not writeVersionFile(configDir):
-    result.success = false
-    result.message = "Failed to write VERSION file"
-    return
-
-  # 5. Update config.toml (using text-based merge to preserve unknown content)
-  let configTomlPath = configDir / CodexConfigFile
+  # Update config.toml (using text-based merge to preserve unknown content)
+  let configTomlPath = toolDir / CodexConfigFile
 
   let (gsdBinaryPath, gsdNotFound) = findGsdBinary()
 
@@ -605,8 +646,8 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
     echo "           Hooks will use 'gsd' and assume it's in PATH."
     echo "           Consider moving gsd to /usr/local/bin/ or ~/.local/bin/"
 
-  # Merge notify hooks using text-based approach to preserve unknown TOML content
-  let gsdNotifyHooks = createGsdNotifyHooks(gsdBinaryPath, configDir)
+  # Merge notify hooks using text-based approach (--config-dir points to .gsd/)
+  let gsdNotifyHooks = createGsdNotifyHooks(gsdBinaryPath, gsdDir)
   let existingContent = if fileExists(configTomlPath): readFile(configTomlPath) else: ""
   let newContent = mergeCodexNotifyText(existingContent, gsdNotifyHooks)
 
@@ -618,60 +659,71 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
     return
   log("Updated config.toml", opts.verbose)
 
-  # 6. Write gsd-config.json
-  let gsdConfig = GsdConfig(
-    version: Version,
-    installType: opts.installType,
-    platform: opts.platform,
-    configDir: configDir,
-    installedAt: now().utc.format("yyyy-MM-dd'T'HH:mm:ss'Z'")
-  )
-  if not saveConfig(gsdConfig, configDir):
+  # Write gsd-config.json to .gsd/ (update platforms list)
+  var gsdConfig: GsdConfig
+  let existingCfg = loadConfig(gsdDir)
+  if existingCfg.isSome:
+    gsdConfig = existingCfg.get()
+    if opts.platform notin gsdConfig.platforms:
+      gsdConfig.platforms.add(opts.platform)
+  else:
+    gsdConfig = GsdConfig(
+      version: Version,
+      installType: opts.installType,
+      platforms: @[opts.platform],
+      gsdDir: gsdDir,
+      installedAt: now().utc.format("yyyy-MM-dd'T'HH:mm:ss'Z'")
+    )
+  gsdConfig.version = Version
+  gsdConfig.gsdDir = gsdDir
+  if not saveConfig(gsdConfig, gsdDir):
     result.success = false
     result.message = "Failed to write gsd-config.json"
     return
-
-  # 7. Create cache directory
-  let cacheDir = getGsdCacheDir(configDir)
-  if not dirExists(cacheDir):
-    try:
-      createDir(cacheDir)
-    except OSError:
-      discard  # Non-fatal
 
   result.success = true
   result.message = "Installation complete"
 
 proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
-  ## Main installation procedure - dispatches to platform-specific installer
+  ## Main installation procedure - two-phase install
+  ## Phase A: Shared resources → .gsd/
+  ## Phase B: Tool-specific files → .claude/ or .codex/
 
   # Use Codex-specific installer if Codex platform
   if opts.platform == pCodexCli:
     return installCodex(sourceDir, opts)
 
   # Claude Code installation
-  let configDir = if opts.configDir.len > 0:
+
+  # Resolve gsdDir (.gsd/ directory)
+  let gsdDir = if opts.configDir.len > 0:
     expandPath(opts.configDir)
   elif opts.installType == itLocal:
+    platform.getLocalGsdDir()
+  else:
+    platform.getGlobalGsdDir()
+
+  # Resolve toolDir (.claude/ directory)
+  let toolDir = if opts.installType == itLocal:
     platform.getLocalConfigDir(opts.platform)
   else:
     platform.getGlobalConfigDir(opts.platform)
 
-  result.configDir = configDir
+  result.configDir = gsdDir
 
-  # Create config directory if needed
-  if not dirExists(configDir):
-    try:
-      createDir(configDir)
-    except OSError as e:
-      result.success = false
-      result.message = "Failed to create config directory: " & e.msg
-      return
+  # Create directories if needed
+  for dir in [gsdDir, toolDir]:
+    if not dirExists(dir):
+      try:
+        createDir(dir)
+      except OSError as e:
+        result.success = false
+        result.message = "Failed to create directory: " & e.msg
+        return
 
-  echo "Installing GSD to ", configDir, "..."
+  echo "Installing GSD to ", gsdDir, " + ", toolDir, "..."
 
   # Determine install type for path rewriting
-  # Custom config-dir overrides default install type for path rewriting
   let installTypeStr = if opts.configDir.len > 0:
     "custom"
   elif opts.installType == itLocal:
@@ -679,24 +731,39 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
   else:
     "global"
 
-  # 1. Copy resource directories (with path rewriting for local/custom installs)
-  let gsdDir = configDir / GsdDirName
-  let commandsDir = configDir / "commands" / "gsd"
+  # Phase A: Shared resources to .gsd/
 
   # Copy gsd/ resources (templates, workflows, references)
   let gsdSource = sourceDir / "gsd"
   if dirExists(gsdSource):
-    if not copyResourceDirWithRewrite(gsdSource, gsdDir, installTypeStr, configDir, opts.platform, opts.verbose):
+    if not installSharedResources(gsdSource, gsdDir, installTypeStr, gsdDir, opts.verbose):
       result.success = false
       result.message = "Failed to copy gsd resources"
       return
-    echo "  Installed gsd resources"
+    echo "  Installed shared resources to ", gsdDir
+
+  # Write VERSION to .gsd/
+  if not writeVersionFile(gsdDir):
+    result.success = false
+    result.message = "Failed to write VERSION file"
+    return
+
+  # Create cache in .gsd/
+  let cacheDir = getGsdCacheDir(gsdDir)
+  if not dirExists(cacheDir):
+    try:
+      createDir(cacheDir)
+    except OSError:
+      discard  # Non-fatal
+
+  # Phase B: Tool-specific files to .claude/
 
   # Copy commands/gsd/ (with path rewriting)
+  let commandsDir = toolDir / "commands" / "gsd"
   let commandsSource = sourceDir / "commands" / "gsd"
   if dirExists(commandsSource):
-    createDir(configDir / "commands")
-    if not copyResourceDirWithRewrite(commandsSource, commandsDir, installTypeStr, configDir, opts.platform, opts.verbose):
+    createDir(toolDir / "commands")
+    if not copyResourceDirWithRewrite(commandsSource, commandsDir, installTypeStr, gsdDir, opts.verbose):
       result.success = false
       result.message = "Failed to copy commands"
       return
@@ -704,22 +771,16 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
 
   # Install agents (merge, don't replace - preserves user's custom agents)
   let agentsSource = sourceDir / "agents"
-  let agentsDir = configDir / "agents"
+  let agentsDir = toolDir / "agents"
   if dirExists(agentsSource):
-    if not installGsdAgents(agentsSource, agentsDir, installTypeStr, configDir, opts.platform, opts.verbose):
+    if not installGsdAgents(agentsSource, agentsDir, installTypeStr, gsdDir, opts.verbose):
       result.success = false
       result.message = "Failed to install agents"
       return
     echo "  Installed agents"
 
-  # 2. Write VERSION file
-  if not writeVersionFile(configDir):
-    result.success = false
-    result.message = "Failed to write VERSION file"
-    return
-
-  # 3. Update settings.json
-  let settingsPath = configDir / "settings.json"
+  # Update settings.json (in tool dir)
+  let settingsPath = toolDir / "settings.json"
   var settings = loadSettings(settingsPath)
 
   let (gsdBinaryPath, gsdNotFound) = findGsdBinary()
@@ -729,12 +790,12 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
     echo "           Hooks will use 'gsd' and assume it's in PATH."
     echo "           Consider moving gsd to /usr/local/bin/ or ~/.local/bin/"
 
-  # Merge hooks (pass configDir so hooks use the correct cache location)
-  let gsdHooks = createGsdHooks(gsdBinaryPath, configDir)
+  # Merge hooks (--config-dir points to .gsd/)
+  let gsdHooks = createGsdHooks(gsdBinaryPath, gsdDir)
   settings["hooks"] = mergeHooks(settings, gsdHooks)
 
   # Merge statusLine (note: camelCase is the correct Claude Code format)
-  let statuslineConfig = createStatuslineConfig(gsdBinaryPath, configDir)
+  let statuslineConfig = createStatuslineConfig(gsdBinaryPath, gsdDir)
   let (newStatusline, statuslineChanged) = mergeStatusline(
     settings, statuslineConfig, opts.forceStatusline
   )
@@ -756,29 +817,30 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
     result.message = "Failed to write settings.json: " & e.msg
     return
 
-  # 4. Write gsd-config.json
-  let gsdConfig = GsdConfig(
-    version: Version,
-    installType: opts.installType,
-    platform: opts.platform,
-    configDir: configDir,
-    installedAt: now().utc.format("yyyy-MM-dd'T'HH:mm:ss'Z'")
-  )
-  if not saveConfig(gsdConfig, configDir):
+  # Cleanup old files from tool dir
+  cleanupOldFiles(toolDir, opts.verbose)
+
+  # Write gsd-config.json to .gsd/ (update platforms list)
+  var gsdConfig: GsdConfig
+  let existingCfg = loadConfig(gsdDir)
+  if existingCfg.isSome:
+    gsdConfig = existingCfg.get()
+    if opts.platform notin gsdConfig.platforms:
+      gsdConfig.platforms.add(opts.platform)
+  else:
+    gsdConfig = GsdConfig(
+      version: Version,
+      installType: opts.installType,
+      platforms: @[opts.platform],
+      gsdDir: gsdDir,
+      installedAt: now().utc.format("yyyy-MM-dd'T'HH:mm:ss'Z'")
+    )
+  gsdConfig.version = Version
+  gsdConfig.gsdDir = gsdDir
+  if not saveConfig(gsdConfig, gsdDir):
     result.success = false
     result.message = "Failed to write gsd-config.json"
     return
-
-  # 5. Cleanup old files
-  cleanupOldFiles(configDir, opts.verbose)
-
-  # 6. Create cache directory
-  let cacheDir = getGsdCacheDir(configDir)
-  if not dirExists(cacheDir):
-    try:
-      createDir(cacheDir)
-    except OSError:
-      discard  # Non-fatal
 
   result.success = true
   result.message = "Installation complete"
@@ -824,27 +886,24 @@ proc removeCodexGsdPrompts(promptsDir: string, verbose: bool) =
         except OSError:
           discard
 
-proc uninstallCodex*(configDir: string, verbose: bool): bool =
-  ## Remove GSD from a Codex CLI config directory
-  let gsdDir = configDir / GsdDirName
-  let promptsDir = configDir / CodexPromptsDir
-  let agentsMdFile = configDir / CodexAgentsMdFile
-  let configFile = configDir / ConfigFileName
+proc uninstallCodex*(gsdDir: string, verbose: bool): bool =
+  ## Remove GSD Codex CLI files from tool dir, update .gsd/ config
+  ## gsdDir is the .gsd/ directory; tool dir is derived from platform
 
-  echo "Uninstalling GSD from ", configDir, " (Codex CLI)..."
+  # Derive tool dir (use resolved paths to handle symlinks like /var → /private/var)
+  let toolDir = if resolvedPath(gsdDir) == resolvedPath(platform.getLocalGsdDir()):
+    platform.getLocalConfigDir(pCodexCli)
+  else:
+    platform.getGlobalConfigDir(pCodexCli)
 
-  # Remove gsd/ directory entirely (GSD-owned)
-  if dirExists(gsdDir):
-    try:
-      removeDir(gsdDir)
-      log("Removed: " & gsdDir, verbose)
-    except OSError as e:
-      stderr.writeLine "Warning: Could not remove ", gsdDir, ": ", e.msg
+  echo "Uninstalling GSD from ", toolDir, " (Codex CLI)..."
 
   # Remove GSD prompt files (gsd-*.md)
+  let promptsDir = toolDir / CodexPromptsDir
   removeCodexGsdPrompts(promptsDir, verbose)
 
   # Remove AGENTS.md
+  let agentsMdFile = toolDir / CodexAgentsMdFile
   if fileExists(agentsMdFile):
     try:
       removeFile(agentsMdFile)
@@ -852,66 +911,65 @@ proc uninstallCodex*(configDir: string, verbose: bool): bool =
     except OSError:
       discard
 
-  # Remove config file
-  if fileExists(configFile):
-    try:
-      removeFile(configFile)
-      log("Removed: " & configFile, verbose)
-    except OSError:
-      discard
-
-  # Update config.toml to remove GSD hooks (using text-based approach)
-  let configTomlPath = configDir / CodexConfigFile
+  # Update config.toml to remove GSD hooks
+  let configTomlPath = toolDir / CodexConfigFile
   if fileExists(configTomlPath):
     try:
       let existingContent = readFile(configTomlPath)
-      # Pass empty hooks list to remove GSD hooks while preserving other content
       let newContent = mergeCodexNotifyText(existingContent, @[])
       writeFile(configTomlPath, newContent)
       log("Updated config.toml", verbose)
     except IOError:
       stderr.writeLine "Warning: Could not update config.toml"
 
-  echo "GSD uninstalled."
+  # Update .gsd/gsd-config.json — remove platform from list
+  let cfg = loadConfig(gsdDir)
+  if cfg.isSome:
+    var config = cfg.get()
+    config.platforms = config.platforms.filterIt(it != pCodexCli)
+    if config.platforms.len == 0:
+      # No platforms left — remove .gsd/ entirely
+      try:
+        removeDir(gsdDir)
+        log("Removed: " & gsdDir, verbose)
+      except OSError as e:
+        stderr.writeLine "Warning: Could not remove ", gsdDir, ": ", e.msg
+    else:
+      discard saveConfig(config, gsdDir)
+
+  echo "GSD (Codex CLI) uninstalled."
   return true
 
-proc uninstall*(configDir: string, verbose: bool, p: Platform = pClaudeCode): bool =
-  ## Remove GSD from a config directory
-  ## Dispatches to platform-specific uninstaller
+proc uninstall*(gsdDir: string, verbose: bool, p: Platform = pClaudeCode): bool =
+  ## Remove GSD from tool directory and update .gsd/ config
+  ## gsdDir is the .gsd/ directory; tool dir is derived from platform
 
   if p == pCodexCli:
-    return uninstallCodex(configDir, verbose)
+    return uninstallCodex(gsdDir, verbose)
 
-  # Claude Code uninstall
-  let gsdDir = configDir / GsdDirName
-  let commandsDir = configDir / "commands" / "gsd"
-  let agentsDir = configDir / "agents"
-  let configFile = configDir / ConfigFileName
+  # Derive tool dir (use resolved paths to handle symlinks like /var → /private/var)
+  let toolDir = if resolvedPath(gsdDir) == resolvedPath(platform.getLocalGsdDir()):
+    platform.getLocalConfigDir(p)
+  else:
+    platform.getGlobalConfigDir(p)
 
-  echo "Uninstalling GSD from ", configDir, "..."
+  echo "Uninstalling GSD from ", toolDir, "..."
 
-  # Remove gsd/ and commands/gsd/ directories entirely (GSD-owned)
-  for dir in [gsdDir, commandsDir]:
-    if dirExists(dir):
-      try:
-        removeDir(dir)
-        log("Removed: " & dir, verbose)
-      except OSError as e:
-        stderr.writeLine "Warning: Could not remove ", dir, ": ", e.msg
+  # Remove commands/gsd/ from tool dir
+  let commandsDir = toolDir / "commands" / "gsd"
+  if dirExists(commandsDir):
+    try:
+      removeDir(commandsDir)
+      log("Removed: " & commandsDir, verbose)
+    except OSError as e:
+      stderr.writeLine "Warning: Could not remove ", commandsDir, ": ", e.msg
 
   # Remove only GSD agent files, preserving user's custom agents
+  let agentsDir = toolDir / "agents"
   removeGsdAgents(agentsDir, verbose)
 
-  # Remove config file
-  if fileExists(configFile):
-    try:
-      removeFile(configFile)
-      log("Removed: " & configFile, verbose)
-    except OSError:
-      discard
-
   # Update settings.json to remove GSD hooks
-  let settingsPath = configDir / "settings.json"
+  let settingsPath = toolDir / "settings.json"
   if fileExists(settingsPath):
     var settings = loadSettings(settingsPath)
 
@@ -953,5 +1011,130 @@ proc uninstall*(configDir: string, verbose: bool, p: Platform = pClaudeCode): bo
     except IOError:
       stderr.writeLine "Warning: Could not update settings.json"
 
+  # Update .gsd/gsd-config.json — remove platform from list
+  let cfg = loadConfig(gsdDir)
+  if cfg.isSome:
+    var config = cfg.get()
+    config.platforms = config.platforms.filterIt(it != p)
+    if config.platforms.len == 0:
+      # No platforms left — remove .gsd/ entirely
+      try:
+        removeDir(gsdDir)
+        log("Removed: " & gsdDir, verbose)
+      except OSError as e:
+        stderr.writeLine "Warning: Could not remove ", gsdDir, ": ", e.msg
+    else:
+      discard saveConfig(config, gsdDir)
+
   echo "GSD uninstalled."
+  return true
+
+proc detectLegacyInstall*(): seq[InstalledConfig] =
+  ## Detect v0.2 legacy installs (gsd-config.json in tool dirs, not .gsd/)
+  result = @[]
+  for p in [pClaudeCode, pCodexCli]:
+    for dir in [platform.getLocalConfigDir(p), platform.getGlobalConfigDir(p)]:
+      if fileExists(dir / ConfigFileName):
+        # It's a legacy install only if it's a tool dir, not a .gsd/ dir
+        if dir != platform.getLocalGsdDir() and dir != platform.getGlobalGsdDir():
+          result.add(InstalledConfig(platform: p, dir: dir))
+
+proc migrateLegacyInstall*(legacyConfigs: seq[InstalledConfig], verbose: bool): bool =
+  ## Migrate from v0.2 (tool-dir-based) to v0.3 (.gsd/-based) layout
+  ## Creates .gsd/, copies shared resources, cleans up old files.
+  ## After migration, caller should run normal install to update tool-specific files.
+  if legacyConfigs.len == 0:
+    return true
+
+  echo "Detected legacy v0.2 installation. Migrating to v0.3..."
+
+  # Determine target gsdDir based on install type
+  let firstCfg = loadConfig(legacyConfigs[0].dir)
+  let isLocal = if firstCfg.isSome:
+    firstCfg.get().installType == itLocal
+  else:
+    legacyConfigs[0].dir == platform.getLocalConfigDir(legacyConfigs[0].platform)
+
+  let gsdDir = if isLocal: platform.getLocalGsdDir() else: platform.getGlobalGsdDir()
+
+  # Create .gsd/ directory
+  if not dirExists(gsdDir):
+    try:
+      createDir(gsdDir)
+    except OSError as e:
+      stderr.writeLine "Error creating .gsd/ directory: ", e.msg
+      return false
+
+  # Copy shared resources from first legacy dir's gsd/ subdirectory
+  let legacyGsdDir = legacyConfigs[0].dir / "gsd"
+  if dirExists(legacyGsdDir):
+    if not copyDirRecursive(legacyGsdDir, gsdDir, verbose):
+      stderr.writeLine "Error copying shared resources."
+      return false
+    echo "  Migrated shared resources to ", gsdDir
+
+  # Move cache from first legacy dir
+  let legacyCacheDir = legacyConfigs[0].dir / "cache"
+  let newCacheDir = gsdDir / "cache"
+  if dirExists(legacyCacheDir) and not dirExists(newCacheDir):
+    try:
+      moveDir(legacyCacheDir, newCacheDir)
+      echo "  Migrated cache to ", newCacheDir
+    except OSError:
+      discard copyDirRecursive(legacyCacheDir, newCacheDir, verbose)
+
+  if not dirExists(newCacheDir):
+    try:
+      createDir(newCacheDir)
+    except OSError:
+      discard
+
+  # Write VERSION to .gsd/
+  discard writeVersionFile(gsdDir)
+
+  # Collect all platforms
+  var platforms: seq[Platform] = @[]
+  for legacy in legacyConfigs:
+    if legacy.platform notin platforms:
+      platforms.add(legacy.platform)
+
+  # Write new gsd-config.json
+  let installType = if firstCfg.isSome: firstCfg.get().installType else: itGlobal
+  let gsdConfig = GsdConfig(
+    version: Version,
+    installType: installType,
+    platforms: platforms,
+    gsdDir: gsdDir,
+    installedAt: now().utc.format("yyyy-MM-dd'T'HH:mm:ss'Z'")
+  )
+  discard saveConfig(gsdConfig, gsdDir)
+
+  # Clean up old files from legacy tool dirs
+  for legacy in legacyConfigs:
+    let oldGsdDir = legacy.dir / "gsd"
+    let oldCacheDir = legacy.dir / "cache"
+    let oldConfigFile = legacy.dir / ConfigFileName
+
+    if dirExists(oldGsdDir):
+      try:
+        removeDir(oldGsdDir)
+        log("Removed legacy: " & oldGsdDir, verbose)
+      except OSError:
+        discard
+
+    if dirExists(oldCacheDir):
+      try:
+        removeDir(oldCacheDir)
+        log("Removed legacy: " & oldCacheDir, verbose)
+      except OSError:
+        discard
+
+    if fileExists(oldConfigFile):
+      try:
+        removeFile(oldConfigFile)
+        log("Removed legacy: " & oldConfigFile, verbose)
+      except OSError:
+        discard
+
+  echo "  Migration complete. Legacy files cleaned up."
   return true

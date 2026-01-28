@@ -1,7 +1,7 @@
 ## Platform abstraction for GSD
 ## Handles differences between Claude Code and Codex CLI
 
-import std/[os, strutils]
+import std/[os, strutils, json]
 
 type
   Platform* = enum
@@ -18,6 +18,7 @@ const
   GsdConfigFileName = "gsd-config.json"
 
 const
+  GsdOwnDirName* = ".gsd"
   ClaudeConfigDirName* = ".claude"
   CodexConfigDirName* = ".codex"
 
@@ -55,6 +56,22 @@ proc getLocalConfigDir*(p: Platform): string =
 proc getGlobalConfigDir*(p: Platform): string =
   ## Returns ~/.<platform-config-dir> for a platform
   result = getHomeDir() / p.getConfigDirName()
+
+proc getLocalGsdDir*(): string =
+  ## Returns ./.gsd
+  result = getCurrentDir() / GsdOwnDirName
+
+proc getGlobalGsdDir*(): string =
+  ## Returns ~/.gsd
+  result = getHomeDir() / GsdOwnDirName
+
+proc resolvedPath*(path: string): string =
+  ## Resolve symlinks in path for reliable comparison
+  ## On macOS, /var is a symlink to /private/var which can cause mismatches
+  try:
+    return expandFilename(path)
+  except OSError:
+    return path
 
 proc getPathPrefix*(p: Platform): string =
   ## Get the path prefix for file references (e.g., ~/.claude or ~/.codex)
@@ -107,17 +124,36 @@ proc parsePlatformChoice*(s: string): PlatformChoice =
 
 proc findInstalledPlatforms*(): seq[Platform] =
   ## Find all platforms with GSD installed
-  ## Checks for gsd-config.json in each platform's config directory
+  ## v0.3+: reads platforms array from .gsd/gsd-config.json
+  ## v0.2 fallback: checks each tool dir for gsd-config.json
   result = @[]
 
-  # Check Claude Code
+  # v0.3: Check .gsd/gsd-config.json (local then global)
+  for gsdDir in [getLocalGsdDir(), getGlobalGsdDir()]:
+    let configPath = gsdDir / GsdConfigFileName
+    if fileExists(configPath):
+      try:
+        let content = readFile(configPath)
+        let jsonNode = parseJson(content)
+        if jsonNode.hasKey("platforms") and jsonNode["platforms"].kind == JArray:
+          for item in jsonNode["platforms"]:
+            let platStr = item.getStr("")
+            try:
+              result.add(parsePlatform(platStr))
+            except ValueError:
+              discard
+          if result.len > 0:
+            return
+      except CatchableError:
+        discard
+
+  # v0.2 fallback: Check each tool dir
   let claudeGlobal = getHomeDir() / ClaudeConfigDirName
   let claudeLocal = getCurrentDir() / ClaudeConfigDirName
 
   if fileExists(claudeGlobal / GsdConfigFileName) or fileExists(claudeLocal / GsdConfigFileName):
     result.add(pClaudeCode)
 
-  # Check Codex CLI
   let codexGlobal = getHomeDir() / CodexConfigDirName
   let codexLocal = getCurrentDir() / CodexConfigDirName
 

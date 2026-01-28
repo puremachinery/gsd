@@ -145,9 +145,9 @@ proc checkUpdateAvailable(configDir: string = ""): bool =
   if configDir.len > 0:
     locations.add(configDir / "cache" / "gsd-update-check.json")
   else:
-    # Check both possible cache locations
-    locations.add(getCurrentDir() / ".claude" / "cache" / "gsd-update-check.json")
-    locations.add(getHomeDir() / ".claude" / "cache" / "gsd-update-check.json")
+    # Check .gsd/cache/ (local then global)
+    locations.add(getCurrentDir() / ".gsd" / "cache" / "gsd-update-check.json")
+    locations.add(getHomeDir() / ".gsd" / "cache" / "gsd-update-check.json")
 
   for cachePath in locations:
     if fileExists(cachePath):

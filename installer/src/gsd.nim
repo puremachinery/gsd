@@ -1,7 +1,7 @@
 ## GSD - Get Stuff Done
 ## CLI entry point for installer and hooks
 
-import std/[os, strutils, parseopt, options, json, terminal]
+import std/[os, strutils, parseopt, options, json, terminal, sequtils]
 import config, install, statusline, update, platform
 
 proc isInteractive(): bool =
@@ -15,9 +15,11 @@ proc promptPlatformChoice(): PlatformChoice =
   ## Prompt user to select platform(s) for installation
   echo ""
   echo "Select platform to install GSD:"
-  echo "  1) Claude Code (~/.claude/)"
-  echo "  2) Codex CLI (~/.codex/)"
+  echo "  1) Claude Code"
+  echo "  2) Codex CLI"
   echo "  3) Both"
+  echo ""
+  echo "Shared resources install to ~/.gsd/"
   echo ""
   stdout.write "Enter choice [1-3]: "
   stdout.flushFile()
@@ -290,32 +292,24 @@ proc cmdUninstall(args: seq[string]) =
 
   # Normalize explicit config dir if provided
   if configDir.len > 0:
-    if platformExplicit and platformChoice == pcBoth:
-      stderr.writeLine "Error: --config-dir cannot be used with --platform=both."
-      stderr.writeLine "Specify a single platform or omit --platform."
-      quit(1)
-
     configDir = expandPath(configDir)
-    # Uninstall from specific config dir
     let cfg = loadConfig(configDir)
-    var targetPlatform = pClaudeCode
-    if platformExplicit:
-      targetPlatform = platformChoiceToSeq(platformChoice)[0]
-      if cfg.isSome and cfg.get().platform != targetPlatform:
-        stderr.writeLine "Error: gsd-config.json platform does not match --platform."
-        quit(1)
-    elif cfg.isSome:
-      targetPlatform = cfg.get().platform
-    else:
-      let inferred = inferPlatformFromDir(configDir)
-      if inferred.isSome:
-        targetPlatform = inferred.get()
-      else:
-        stderr.writeLine "Error: Unable to determine platform for ", configDir, "."
-        stderr.writeLine "Provide --platform or restore gsd-config.json."
-        quit(1)
 
-    discard uninstall(configDir, verbose, targetPlatform)
+    if platformExplicit:
+      # Uninstall specific platform(s) from this config dir
+      let platforms = platformChoiceToSeq(platformChoice)
+      for targetPlatform in platforms:
+        if cfg.isSome and targetPlatform notin cfg.get().platforms:
+          stderr.writeLine "Warning: ", $targetPlatform, " not found in gsd-config.json platforms."
+        discard uninstall(configDir, verbose, targetPlatform)
+    elif cfg.isSome:
+      # Uninstall all platforms listed in config
+      for p in cfg.get().platforms:
+        discard uninstall(configDir, verbose, p)
+    else:
+      stderr.writeLine "Error: Unable to determine platforms for ", configDir, "."
+      stderr.writeLine "Provide --platform or restore gsd-config.json."
+      quit(1)
     return
 
   # Handle --all flag
@@ -336,16 +330,24 @@ proc cmdUninstall(args: seq[string]) =
     var targets: seq[InstalledConfig] = @[]
 
     if useGlobal or useLocal:
-      for plat in platforms:
-        let targetDir = if useGlobal:
-          platform.getGlobalConfigDir(plat)
-        else:
-          platform.getLocalConfigDir(plat)
+      # v0.3: .gsd/ dirs, not tool dirs
+      let gsdDir = if useGlobal:
+        platform.getGlobalGsdDir()
+      else:
+        platform.getLocalGsdDir()
 
-        if fileExists(targetDir / ConfigFileName):
-          targets.add(InstalledConfig(platform: plat, dir: targetDir))
+      if fileExists(gsdDir / ConfigFileName):
+        let cfg = loadConfig(gsdDir)
+        if cfg.isSome:
+          for plat in platforms:
+            if plat in cfg.get().platforms:
+              targets.add(InstalledConfig(platform: plat, dir: gsdDir))
+            else:
+              stderr.writeLine "Error: No GSD installation found for ", $plat, "."
         else:
-          stderr.writeLine "Error: No GSD installation found for ", $plat, "."
+          stderr.writeLine "Error: Could not read config at ", gsdDir
+      else:
+        stderr.writeLine "Error: No GSD installation found at ", gsdDir
     else:
       for install in installed:
         if install.platform in platforms:
@@ -381,61 +383,65 @@ proc cmdUninstall(args: seq[string]) =
     stderr.writeLine "Error: Multiple GSD installations found. Specify --platform or --all."
     quit(1)
 
-proc runDoctorForPlatform(resolvedDir: string, targetPlatform: Platform): tuple[issues: seq[string], warnings: seq[string]] =
-  ## Run health check for a single platform installation
-  ## Returns (issues, warnings) lists
+proc runDoctorForPlatform(gsdDir: string, targetPlatform: Platform): tuple[issues: seq[string], warnings: seq[string]] =
+  ## Run health check for a platform installation
+  ## Checks both .gsd/ (shared) and tool dir (platform-specific)
   var issues: seq[string] = @[]
   var warnings: seq[string] = @[]
 
-  # Load config
-  let cfg = loadConfig(resolvedDir)
+  # Derive tool dir
+  let toolDir = if gsdDir == platform.getLocalGsdDir():
+    platform.getLocalConfigDir(targetPlatform)
+  else:
+    platform.getGlobalConfigDir(targetPlatform)
 
-  # Check gsd-config.json
-  let configPath = resolvedDir / ConfigFileName
+  # Load config from .gsd/
+  let cfg = loadConfig(gsdDir)
+
+  # Check .gsd/gsd-config.json
+  let configPath = gsdDir / ConfigFileName
   if fileExists(configPath):
     echo "[OK] gsd-config.json exists"
     if cfg.isNone:
       issues.add("gsd-config.json is corrupted")
     else:
-      echo "[OK] Platform: ", $cfg.get().platform
+      echo "[OK] Platforms: ", cfg.get().platforms.mapIt($it).join(", ")
   else:
     issues.add("gsd-config.json missing")
 
-  # Check VERSION file
-  let versionPath = resolvedDir / GsdDirName / VersionFileName
+  # Check .gsd/VERSION
+  let versionPath = gsdDir / VersionFileName
   if fileExists(versionPath):
     let version = readFile(versionPath).strip()
     echo "[OK] VERSION: ", version
   else:
     issues.add("VERSION file missing")
 
-  # Check gsd/ directory
-  let gsdDir = resolvedDir / GsdDirName
-  if dirExists(gsdDir):
-    echo "[OK] gsd/ directory exists"
+  # Check shared resources directly in .gsd/
+  for subdir in ["templates", "workflows", "references"]:
+    if dirExists(gsdDir / subdir):
+      echo "[OK] ", subdir, "/ exists"
+    else:
+      warnings.add(subdir & "/ directory missing in .gsd/")
 
-    # Check subdirectories
-    for subdir in ["templates", "workflows", "references"]:
-      if not dirExists(gsdDir / subdir):
-        warnings.add("gsd/" & subdir & " directory missing")
-  else:
-    issues.add("gsd/ directory missing")
+  # Platform-specific checks (in tool dir)
+  echo ""
+  echo "Tool directory: ", toolDir
 
-  # Platform-specific checks
   case targetPlatform
   of pClaudeCode:
     # Check commands/gsd/
-    let commandsDir = resolvedDir / "commands" / "gsd"
+    let commandsDir = toolDir / "commands" / "gsd"
     if dirExists(commandsDir):
       var cmdCount = 0
       for _ in walkDir(commandsDir):
         cmdCount.inc
       echo "[OK] commands/gsd/ exists (", cmdCount, " files)"
     else:
-      issues.add("commands/gsd/ directory missing")
+      issues.add("commands/gsd/ directory missing in " & toolDir)
 
     # Check agents/
-    let agentsDir = resolvedDir / "agents"
+    let agentsDir = toolDir / "agents"
     if dirExists(agentsDir):
       var agentCount = 0
       for _ in walkDir(agentsDir):
@@ -449,7 +455,7 @@ proc runDoctorForPlatform(resolvedDir: string, targetPlatform: Platform): tuple[
 
   of pCodexCli:
     # Check prompts/
-    let promptsDir = resolvedDir / CodexPromptsDir
+    let promptsDir = toolDir / CodexPromptsDir
     if dirExists(promptsDir):
       var promptCount = 0
       for kind, path in walkDir(promptsDir):
@@ -457,20 +463,20 @@ proc runDoctorForPlatform(resolvedDir: string, targetPlatform: Platform): tuple[
           promptCount.inc
       echo "[OK] prompts/ exists (", promptCount, " GSD prompts)"
     else:
-      issues.add("prompts/ directory missing")
+      issues.add("prompts/ directory missing in " & toolDir)
 
     # Check AGENTS.md
-    let agentsMdPath = resolvedDir / CodexAgentsMdFile
+    let agentsMdPath = toolDir / CodexAgentsMdFile
     if fileExists(agentsMdPath):
       echo "[OK] AGENTS.md exists"
     else:
       warnings.add("AGENTS.md missing")
 
-  # Platform-specific config file checks
+  # Platform-specific config file checks (in tool dir)
   case targetPlatform
   of pClaudeCode:
     # Check settings.json
-    let settingsPath = resolvedDir / "settings.json"
+    let settingsPath = toolDir / "settings.json"
     if fileExists(settingsPath):
       echo "[OK] settings.json exists"
 
@@ -518,10 +524,9 @@ proc runDoctorForPlatform(resolvedDir: string, targetPlatform: Platform): tuple[
 
   of pCodexCli:
     # Check config.toml
-    let configTomlPath = resolvedDir / CodexConfigFile
+    let configTomlPath = toolDir / CodexConfigFile
     if fileExists(configTomlPath):
       echo "[OK] config.toml exists"
-      # Check for GSD notify hooks in config.toml
       let content = readFile(configTomlPath)
       if content.contains("#gsd") or content.contains("gsd "):
         echo "[OK] GSD hooks configured"
@@ -574,40 +579,52 @@ proc cmdDoctor(args: seq[string]) =
   if configDir.len > 0:
     let resolvedDir = expandPath(configDir)
     let cfg = loadConfig(resolvedDir)
-    if platformExplicit and cfg.isSome and cfg.get().platform != targetPlatform:
-      stderr.writeLine "Error: gsd-config.json platform does not match --platform."
-      quit(1)
-    if cfg.isSome:
-      targetPlatform = cfg.get().platform
-    elif not platformExplicit:
-      let inferred = inferPlatformFromDir(resolvedDir)
-      if inferred.isSome:
-        targetPlatform = inferred.get()
-      else:
-        echo "Warning: Unable to determine platform for ", resolvedDir, "; defaulting to claude."
 
-    echo "Checking GSD installation at ", resolvedDir, " (", $targetPlatform, ")..."
-    echo ""
-
-    let (issues, warnings) = runDoctorForPlatform(resolvedDir, targetPlatform)
-
-    echo ""
-    if issues.len == 0 and warnings.len == 0:
-      echo "Installation is healthy!"
+    # Determine which platforms to check
+    var platformsToCheck: seq[Platform] = @[]
+    if platformExplicit:
+      platformsToCheck = @[targetPlatform]
+      if cfg.isSome and targetPlatform notin cfg.get().platforms:
+        stderr.writeLine "Warning: ", $targetPlatform, " not in gsd-config.json platforms list."
+    elif cfg.isSome:
+      platformsToCheck = cfg.get().platforms
     else:
-      if issues.len > 0:
-        echo "Issues:"
-        for issue in issues:
-          echo "  - ", issue
-      if warnings.len > 0:
-        echo "Warnings:"
-        for warning in warnings:
-          echo "  - ", warning
+      platformsToCheck = @[pClaudeCode]
+      echo "Warning: Unable to determine platforms for ", resolvedDir, "; defaulting to claude."
 
-      if issues.len > 0:
+    var totalIssues = 0
+    var totalWarnings = 0
+
+    for i, plat in platformsToCheck:
+      if i > 0:
         echo ""
-        echo "Run 'gsd install' to fix issues."
-        quit(1)
+        echo "---"
+        echo ""
+      echo "Checking GSD installation at ", resolvedDir, " (", $plat, ")..."
+      echo ""
+
+      let (issues, warnings) = runDoctorForPlatform(resolvedDir, plat)
+
+      echo ""
+      if issues.len == 0 and warnings.len == 0:
+        echo "Installation is healthy!"
+      else:
+        if issues.len > 0:
+          echo "Issues:"
+          for issue in issues:
+            echo "  - ", issue
+        if warnings.len > 0:
+          echo "Warnings:"
+          for warning in warnings:
+            echo "  - ", warning
+
+      totalIssues += issues.len
+      totalWarnings += warnings.len
+
+    if totalIssues > 0:
+      echo ""
+      echo "Run 'gsd install' to fix issues."
+      quit(1)
     return
 
   # If specific platform provided, check just that
@@ -832,6 +849,13 @@ proc cmdUpdate(args: seq[string]) =
     stderr.writeLine "or that the binary is located alongside the gsd/ and commands/ directories."
     quit(1)
 
+  # Detect and migrate legacy v0.2 installs
+  let legacyConfigs = detectLegacyInstall()
+  if legacyConfigs.len > 0:
+    if not migrateLegacyInstall(legacyConfigs, verbose):
+      stderr.writeLine "Error: Legacy migration failed."
+      quit(1)
+
   # Determine which platforms to update
   let installed = listInstalledConfigs()
   if installed.len == 0:
@@ -864,7 +888,7 @@ proc cmdUpdate(args: seq[string]) =
   for target in targets:
     let cfg = loadConfig(target.dir)
     var opts = InstallOptions(
-      installType: if cfg.isSome: cfg.get().installType else: inferInstallType(target.dir, target.platform),
+      installType: if cfg.isSome: cfg.get().installType else: inferInstallType(target.dir),
       platform: target.platform,
       forceStatusline: false,
       verbose: verbose
@@ -872,8 +896,8 @@ proc cmdUpdate(args: seq[string]) =
 
     # If it was a custom install, preserve the path
     if opts.installType == itCustom:
-      if cfg.isSome and cfg.get().configDir.len > 0:
-        opts.configDir = cfg.get().configDir
+      if cfg.isSome and cfg.get().gsdDir.len > 0:
+        opts.configDir = cfg.get().gsdDir
       else:
         opts.configDir = target.dir
 

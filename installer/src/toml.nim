@@ -360,16 +360,17 @@ proc mergeCodexNotifyText*(content: string, gsdNotify: seq[TomlValue]): string =
 
   return resultLines.join("\n")
 
-proc createGsdNotifyHooks*(gsdBinaryPath, configDir: string): seq[TomlValue] =
+proc createGsdNotifyHooks*(gsdBinaryPath, gsdDir: string): seq[TomlValue] =
   ## Create GSD notify hooks for Codex CLI
   ## Codex uses [[notify]] array of tables
+  ## --config-dir points to .gsd/ directory
   var hooks: seq[TomlValue] = @[]
 
   # Session start hook for update checking
   var sessionHook = newTomlTable()
   sessionHook.tableVal["event"] = newTomlString("session_start")
   sessionHook.tableVal["command"] = newTomlString(
-    "\"" & gsdBinaryPath & "\" check-update --config-dir \"" & configDir & "\" #gsd"
+    "\"" & gsdBinaryPath & "\" check-update --config-dir \"" & gsdDir & "\" #gsd"
   )
   hooks.add(sessionHook)
 
