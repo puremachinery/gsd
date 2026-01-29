@@ -7,7 +7,7 @@ import config
 when defined(windows):
   import std/winlean
 
-  const ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004'u32
+  const ENABLE_VIRTUAL_TERMINAL_PROCESSING = DWORD(0x0004)
 
   proc getConsoleMode(hConsole: Handle, lpMode: ptr DWORD): WINBOOL
     {.stdcall, dynlib: "kernel32", importc: "GetConsoleMode".}

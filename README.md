@@ -58,8 +58,7 @@ cd gsd-darwin-arm64
 ```
 
 Release bundles are available for:
-- macOS (Apple Silicon): `gsd-darwin-arm64.tar.gz`
-- macOS (Intel): `gsd-darwin-x64.tar.gz`
+- macOS (Apple Silicon — also runs on Intel via Rosetta 2): `gsd-darwin-arm64.tar.gz`
 - Linux (x64): `gsd-linux-x64.tar.gz`
 - Windows (x64): `gsd-windows-x64.zip`
 
