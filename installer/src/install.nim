@@ -236,7 +236,7 @@ proc createGsdHooks(gsdBinaryPath, gsdDir: string): JsonNode =
   result = %*{
     "SessionStart": [
       {
-        "matcher": "",  # Empty matcher = always run
+        "matcher": "", # Empty matcher = always run
         "hooks": [
           {
             "type": "command",
@@ -271,7 +271,7 @@ proc cleanupOldFiles(configDir: string, verbose: bool) =
     configDir / "hooks" / "statusline.js",
     configDir / "hooks" / "gsd-check-update.js",
     configDir / "gsd" / "bin" / "install.js",
-    configDir / "gsd-notify.sh"  # Orphaned from older versions
+    configDir / "gsd-notify.sh" # Orphaned from older versions
   ]
 
   for path in oldFiles:
@@ -348,7 +348,7 @@ proc rewritePathReferences*(content, installType, gsdDir: string): string =
     result = content.replace("@~/.gsd/", "@" & gsdDir & "/")
     result = result.replace("~/.gsd/", gsdDir & "/")
   else:
-    result = content  # No rewriting for global
+    result = content # No rewriting for global
 
 proc copyAndRewriteDir(src, dest, installType, gsdDir: string, verbose: bool): bool =
   ## Copy directory, rewriting path references in .md files
@@ -420,7 +420,8 @@ proc copyResourceDirWithRewrite(src, dest, installType, gsdDir: string, verbose:
       discard
     return false
 
-proc installSharedResources(sourceGsdDir, destGsdDir, installTypeStr, gsdDir: string, verbose: bool): bool =
+proc installSharedResources(sourceGsdDir, destGsdDir, installTypeStr, gsdDir: string,
+    verbose: bool): bool =
   ## Install shared resources from gsd/ source to .gsd/ destination
   ## Copies each subdirectory atomically without replacing the .gsd/ root,
   ## so gsd-config.json, VERSION, and cache/ are preserved.
@@ -487,7 +488,8 @@ proc installGsdAgents(sourceDir, destDir, installType, gsdDir: string, verbose: 
 
   return true
 
-proc generateAgentsMd*(agentFiles: seq[string], destPath: string, installType, gsdDir: string): bool =
+proc generateAgentsMd*(agentFiles: seq[string], destPath: string, installType,
+    gsdDir: string): bool =
   ## Generate a single AGENTS.md by concatenating individual agent files
   ## Used for Codex CLI which expects agents in a single file
   try:
@@ -527,7 +529,7 @@ proc installCodexPrompts(sourceDir, destDir, installType, gsdDir: string, verbos
   # Copy each command file, renaming to gsd-*.md format
   let commandsSource = sourceDir / "commands" / "gsd"
   if not dirExists(commandsSource):
-    return true  # No commands to install
+    return true # No commands to install
 
   for kind, path in walkDir(commandsSource):
     if kind == pcFile and path.endsWith(".md"):
@@ -608,7 +610,7 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
     try:
       createDir(cacheDir)
     except OSError:
-      discard  # Non-fatal
+      discard # Non-fatal
 
   # Phase B: Tool-specific files to .codex/
 
@@ -754,7 +756,7 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
     try:
       createDir(cacheDir)
     except OSError:
-      discard  # Non-fatal
+      discard # Non-fatal
 
   # Phase B: Tool-specific files to .claude/
 

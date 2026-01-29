@@ -80,28 +80,28 @@ suite "getContextColor":
   test "green when less than 50% used":
     # remaining=60 means used=40
     let color = getContextColor(60)
-    check color.contains("32")  # Green ANSI code
+    check color.contains("32") # Green ANSI code
 
   test "yellow when 50-65% used":
     # remaining=40 means used=60
     let color = getContextColor(40)
-    check color.contains("33")  # Yellow ANSI code
+    check color.contains("33") # Yellow ANSI code
 
   test "yellow when 65-80% used":
     # remaining=25 means used=75
     let color = getContextColor(25)
-    check color.contains("33")  # Yellow ANSI code
+    check color.contains("33") # Yellow ANSI code
 
   test "red and blink when 80%+ used":
     # remaining=15 means used=85
     let color = getContextColor(15)
-    check color.contains("31")  # Red ANSI code
-    check color.contains("5")   # Blink ANSI code
+    check color.contains("31") # Red ANSI code
+    check color.contains("5") # Blink ANSI code
 
   test "red at edge case 80% used":
     # remaining=20 means used=80
     let color = getContextColor(20)
-    check color.contains("31")  # Red ANSI code
+    check color.contains("31") # Red ANSI code
 
 suite "renderContextBar":
   test "empty bar at 0% used":

@@ -383,7 +383,8 @@ proc cmdUninstall(args: seq[string]) =
     stderr.writeLine "Error: Multiple GSD installations found. Specify --platform or --all."
     quit(1)
 
-proc runDoctorForPlatform(gsdDir: string, targetPlatform: Platform): tuple[issues: seq[string], warnings: seq[string]] =
+proc runDoctorForPlatform(gsdDir: string, targetPlatform: Platform): tuple[issues: seq[string],
+    warnings: seq[string]] =
   ## Run health check for a platform installation
   ## Checks both .gsd/ (shared) and tool dir (platform-specific)
   var issues: seq[string] = @[]
@@ -678,7 +679,8 @@ proc cmdDoctor(args: seq[string]) =
       if totalIssues == 0 and totalWarnings == 0:
         echo "All ", targets.len, " installations are healthy!"
       else:
-        echo "Summary: ", totalIssues, " issue(s), ", totalWarnings, " warning(s) across ", targets.len, " installation(s)"
+        echo "Summary: ", totalIssues, " issue(s), ", totalWarnings, " warning(s) across ",
+            targets.len, " installation(s)"
 
     if totalIssues > 0:
       echo ""
@@ -733,7 +735,8 @@ proc cmdDoctor(args: seq[string]) =
     if totalIssues == 0 and totalWarnings == 0:
       echo "All ", installed.len, " installations are healthy!"
     else:
-      echo "Summary: ", totalIssues, " issue(s), ", totalWarnings, " warning(s) across ", installed.len, " installation(s)"
+      echo "Summary: ", totalIssues, " issue(s), ", totalWarnings, " warning(s) across ",
+          installed.len, " installation(s)"
 
   if totalIssues > 0:
     echo ""

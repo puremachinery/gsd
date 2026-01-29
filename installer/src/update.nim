@@ -9,7 +9,7 @@ const
   UserAgent = "gsd-cli/" & Version
   CacheFileName = "gsd-update-check.json"
   CacheTtlHours = 24
-  HttpTimeoutMs = 15000  # 15 seconds - allows for slow connections
+  HttpTimeoutMs = 15000 # 15 seconds - allows for slow connections
 
 type
   UpdateCheckResult* = object
@@ -105,7 +105,7 @@ proc compareVersions*(current, latest: string): int =
     result = @[]
     for part in clean.split('.'):
       try:
-        result.add(parseInt(part.split('-')[0]))  # Handle pre-release tags
+        result.add(parseInt(part.split('-')[0])) # Handle pre-release tags
       except ValueError:
         result.add(0)
     # Pad to 3 parts
@@ -194,7 +194,7 @@ proc checkForUpdate*(configDir: string = "", forceCheck: bool = false): Option[U
   else:
     let found = findConfigDir()
     if found.isNone:
-      getGlobalConfigDir()  # Default to global
+      getGlobalConfigDir() # Default to global
     else:
       found.get()
 
@@ -232,7 +232,7 @@ proc checkForUpdate*(configDir: string = "", forceCheck: bool = false): Option[U
   var checkResult = UpdateCheckResult(
     currentVersion: currentVersion.get(),
     latestVersion: latest.get().version,
-    updateAvailable: cmp < 0,  # Update available if current < latest
+    updateAvailable: cmp < 0, # Update available if current < latest
     releaseUrl: latest.get().url
   )
 

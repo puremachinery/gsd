@@ -96,7 +96,7 @@ proc getContextColor*(remaining: int): string =
   elif used < 65:
     return Yellow
   elif used < 80:
-    return Yellow  # Could use orange if terminal supports
+    return Yellow # Could use orange if terminal supports
   else:
     return Red & Blink
 

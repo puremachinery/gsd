@@ -53,8 +53,8 @@ suite "mergeHooks":
         "SessionStart": [{
           "matcher": "",
           "hooks": [{"type": "command", "command": "custom-hook"}]
-        }]
-      }
+      }]
+    }
     }
     let gsdHooks = %*{
       "SessionStart": [{
@@ -73,8 +73,8 @@ suite "mergeHooks":
         "SessionStart": [{
           "matcher": "",
           "hooks": [{"type": "command", "command": "gsd old-command #gsd"}]
-        }]
-      }
+      }]
+    }
     }
     let gsdHooks = %*{
       "SessionStart": [{
@@ -94,8 +94,8 @@ suite "mergeHooks":
         "SessionStart": [{
           "matcher": "",
           "hooks": [{"type": "command", "command": "node ~/.claude/hooks/statusline.js"}]
-        }]
-      }
+      }]
+    }
     }
     let gsdHooks = %*{
       "SessionStart": [{
@@ -221,7 +221,8 @@ suite "mergeStatusline":
     check changed == true
 
   test "auto-migrates old node statusline":
-    let existing = %*{"statusLine": {"type": "command", "command": "node ~/.claude/hooks/statusline.js"}}
+    let existing = %*{"statusLine": {"type": "command",
+        "command": "node ~/.claude/hooks/statusline.js"}}
     let (config, changed) = mergeStatusline(existing, gsdStatusline, false)
 
     check config["command"].getStr() == "gsd statusline #gsd"
@@ -282,7 +283,7 @@ See ~/.gsd/ for resources
     let result = rewritePathReferences(content, "local", "")
 
     check result.contains("@/usr/local/bin/something")
-    check result.contains("~/other/path")  # Only ~/.gsd/ is rewritten
+    check result.contains("~/other/path") # Only ~/.gsd/ is rewritten
 
 suite "generateAgentsMd":
   test "generates AGENTS.md from agent files":

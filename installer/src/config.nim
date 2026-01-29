@@ -19,7 +19,7 @@ type
 
   InstalledConfig* = object
     platform*: Platform
-    dir*: string  ## the .gsd/ directory
+    dir*: string ## the .gsd/ directory
 
 proc loadConfig*(configDir: string): Option[GsdConfig]
 
@@ -273,7 +273,7 @@ proc getInstalledVersion*(explicit: string = ""): Option[string] =
 proc isLocalInstall*(explicit: string = ""): bool =
   ## Check if we're dealing with a local install
   if explicit.len > 0:
-    return false  # Explicit is treated as custom
+    return false # Explicit is treated as custom
 
   let localVersion = getLocalConfigDir() / VersionFileName
   return fileExists(localVersion)

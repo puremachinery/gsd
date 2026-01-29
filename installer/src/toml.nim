@@ -121,7 +121,8 @@ proc serializeToml*(doc: TomlDocument): string =
 
   return lines.join("\n") & "\n"
 
-proc parseTomlLine(line: string): tuple[key: string, value: string, isTable: bool, isArrayTable: bool] =
+proc parseTomlLine(line: string): tuple[key: string, value: string, isTable: bool,
+    isArrayTable: bool] =
   ## Parse a single TOML line, returning key-value or table header
   let stripped = line.strip()
 
@@ -345,7 +346,7 @@ proc mergeCodexNotifyText*(content: string, gsdNotify: seq[TomlValue]): string =
   # Append new GSD notify hooks
   if gsdNotify.len > 0:
     if resultLines.len > 0:
-      resultLines.add("")  # Blank line separator
+      resultLines.add("") # Blank line separator
 
     for hook in gsdNotify:
       resultLines.add("[[notify]]")
