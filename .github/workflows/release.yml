@@ -6,6 +6,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -16,15 +19,19 @@ jobs:
           - os: macos-14
             bundle: gsd-darwin-arm64
             archive: tar.gz
-          - os: macos-15-large
+            nim_cpu: ""
+          - os: macos-14
             bundle: gsd-darwin-x64
             archive: tar.gz
+            nim_cpu: "--cpu:amd64 --passC:'-arch x86_64' --passL:'-arch x86_64'"
           - os: ubuntu-latest
             bundle: gsd-linux-x64
             archive: tar.gz
+            nim_cpu: ""
           - os: windows-latest
             bundle: gsd-windows-x64
             archive: zip
+            nim_cpu: ""
 
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +48,7 @@ jobs:
       - name: Build gsd
         run: |
           cd installer
-          nimble build -y -d:release --opt:size
+          nimble build -y -d:release --opt:size ${{ matrix.nim_cpu }}
 
       - name: Run tests (linux only)
         if: matrix.os == 'ubuntu-latest'

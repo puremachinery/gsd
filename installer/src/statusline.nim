@@ -7,6 +7,14 @@ import config
 when defined(windows):
   import std/winlean
 
+  const ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004'u32
+
+  proc getConsoleMode(hConsole: Handle, lpMode: ptr DWORD): WINBOOL
+    {.stdcall, dynlib: "kernel32", importc: "GetConsoleMode".}
+
+  proc setConsoleMode(hConsole: Handle, dwMode: DWORD): WINBOOL
+    {.stdcall, dynlib: "kernel32", importc: "SetConsoleMode".}
+
   var vtEnabled = false
 
   proc enableVirtualTerminal(): bool =
