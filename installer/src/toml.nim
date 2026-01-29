@@ -1,7 +1,7 @@
 ## Minimal TOML writer for Codex CLI config.toml manipulation
 ## Supports reading, merging, and writing TOML config files
 
-import std/[os, strutils, tables, options]
+import std/[os, strutils, tables, options, osproc]
 
 type
   TomlValueKind* = enum
@@ -370,9 +370,9 @@ proc createGsdNotifyHooks*(gsdBinaryPath, gsdDir: string): seq[TomlValue] =
   # Session start hook for update checking
   var sessionHook = newTomlTable()
   sessionHook.tableVal["event"] = newTomlString("session_start")
-  sessionHook.tableVal["command"] = newTomlString(
-    "\"" & gsdBinaryPath & "\" check-update --config-dir \"" & gsdDir & "\" #gsd"
-  )
+  let cmd = quoteShell(gsdBinaryPath) & " check-update --config-dir " &
+      quoteShell(gsdDir) & " #gsd"
+  sessionHook.tableVal["command"] = newTomlString(cmd)
   hooks.add(sessionHook)
 
   return hooks

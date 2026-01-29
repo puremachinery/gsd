@@ -1,7 +1,7 @@
 ## GSD Installation logic
 ## Handles file copying, settings.json merging, and cleanup
 
-import std/[os, json, options, strutils, times, algorithm, sequtils]
+import std/[os, json, options, strutils, times, algorithm, sequtils, osproc]
 import config, platform, toml
 
 const
@@ -232,7 +232,9 @@ proc createGsdHooks(gsdBinaryPath, gsdDir: string): JsonNode =
   ## Create the GSD hook definitions in Claude Code's expected format
   ## Format: { "EventName": [{ "matcher": "...", "hooks": [{ "type": "command", "command": "..." }] }] }
   ## Passes --config-dir pointing to .gsd/ directory
-  ## Both paths are quoted to handle spaces in paths
+  ## Paths are shell-escaped to prevent injection via metacharacters
+  let cmd = quoteShell(gsdBinaryPath) & " check-update --config-dir " &
+      quoteShell(gsdDir) & " #gsd"
   result = %*{
     "SessionStart": [
       {
@@ -240,7 +242,7 @@ proc createGsdHooks(gsdBinaryPath, gsdDir: string): JsonNode =
         "hooks": [
           {
             "type": "command",
-            "command": "\"" & gsdBinaryPath & "\" check-update --config-dir \"" & gsdDir & "\" #gsd"
+            "command": cmd
           }
         ]
       }
@@ -250,10 +252,12 @@ proc createGsdHooks(gsdBinaryPath, gsdDir: string): JsonNode =
 proc createStatuslineConfig(gsdBinaryPath, gsdDir: string): JsonNode =
   ## Create the statusLine config in Claude Code's expected format
   ## Passes --config-dir pointing to .gsd/ directory
-  ## Both paths are quoted to handle spaces in paths
+  ## Paths are shell-escaped to prevent injection via metacharacters
+  let cmd = quoteShell(gsdBinaryPath) & " statusline --config-dir " &
+      quoteShell(gsdDir) & " #gsd"
   result = %*{
     "type": "command",
-    "command": "\"" & gsdBinaryPath & "\" statusline --config-dir \"" & gsdDir & "\" #gsd"
+    "command": cmd
   }
 
 proc writeVersionFile(gsdDir: string): bool =
@@ -1092,7 +1096,8 @@ proc migrateLegacyInstall*(legacyConfigs: seq[InstalledConfig], verbose: bool): 
       discard
 
   # Write VERSION to .gsd/
-  discard writeVersionFile(gsdDir)
+  if not writeVersionFile(gsdDir):
+    echo "  Warning: failed to write VERSION file to ", gsdDir
 
   # Collect all platforms
   var platforms: seq[Platform] = @[]
