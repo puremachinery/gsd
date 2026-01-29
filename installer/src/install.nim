@@ -26,9 +26,60 @@ type
     message*: string
     configDir*: string
 
+  PreInstallState = object
+    gsdDir: string
+    toolDir: string
+    gsdExisted: bool
+    toolExisted: bool
+    settingsBackupPath: string # non-empty if we backed up settings
+
 proc log(msg: string, verbose: bool) =
   if verbose:
     echo "  ", msg
+
+proc capturePreInstallState(gsdDir, toolDir: string): PreInstallState =
+  ## Record what exists before install begins, for rollback
+  result.gsdDir = gsdDir
+  result.toolDir = toolDir
+  result.gsdExisted = dirExists(gsdDir)
+  result.toolExisted = dirExists(toolDir)
+
+proc backupSettings(settingsPath: string): string =
+  ## Back up settings.json before merging. Returns backup path or "" on failure.
+  if not fileExists(settingsPath):
+    return ""
+  let backupPath = settingsPath & ".pre-install.bak"
+  try:
+    copyFile(settingsPath, backupPath)
+    return backupPath
+  except OSError:
+    return ""
+
+proc cleanupOnFailure(state: PreInstallState) =
+  ## Best-effort rollback: remove directories that were freshly created
+  if not state.gsdExisted and dirExists(state.gsdDir):
+    try:
+      removeDir(state.gsdDir)
+      stderr.writeLine "Rolled back: removed ", state.gsdDir
+    except OSError:
+      discard
+
+  if not state.toolExisted and dirExists(state.toolDir):
+    try:
+      removeDir(state.toolDir)
+      stderr.writeLine "Rolled back: removed ", state.toolDir
+    except OSError:
+      discard
+
+  # Restore settings.json backup if one was created
+  if state.settingsBackupPath.len > 0 and fileExists(state.settingsBackupPath):
+    const suffix = ".pre-install.bak"
+    let settingsPath = state.settingsBackupPath[0 ..< state.settingsBackupPath.len - suffix.len]
+    try:
+      moveFile(state.settingsBackupPath, settingsPath)
+      stderr.writeLine "Rolled back: restored ", settingsPath
+    except OSError:
+      discard
 
 proc isOldGsdStatusline*(command: string): bool =
   ## Check if a statusline command is from old GSD (auto-migrate)
@@ -573,6 +624,9 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
 
   result.configDir = gsdDir
 
+  # Capture pre-install state for rollback
+  let state = capturePreInstallState(gsdDir, toolDir)
+
   # Create directories if needed
   for dir in [gsdDir, toolDir]:
     if not dirExists(dir):
@@ -581,6 +635,7 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
       except OSError as e:
         result.success = false
         result.message = "Failed to create directory: " & e.msg
+        cleanupOnFailure(state)
         return
 
   echo "Installing GSD to ", gsdDir, " + ", toolDir, " (Codex CLI)..."
@@ -599,6 +654,7 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
     if not installSharedResources(gsdSource, gsdDir, installTypeStr, gsdDir, opts.verbose):
       result.success = false
       result.message = "Failed to copy gsd resources"
+      cleanupOnFailure(state)
       return
     echo "  Installed shared resources to ", gsdDir
 
@@ -606,6 +662,7 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
   if not writeVersionFile(gsdDir):
     result.success = false
     result.message = "Failed to write VERSION file"
+    cleanupOnFailure(state)
     return
 
   # Create cache in .gsd/
@@ -623,6 +680,7 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
   if not installCodexPrompts(sourceDir, promptsDir, installTypeStr, gsdDir, opts.verbose):
     result.success = false
     result.message = "Failed to install prompts"
+    cleanupOnFailure(state)
     return
   echo "  Installed prompts"
 
@@ -639,6 +697,7 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
     if not generateAgentsMd(agentPaths, agentsMdPath, installTypeStr, gsdDir):
       result.success = false
       result.message = "Failed to generate AGENTS.md"
+      cleanupOnFailure(state)
       return
     echo "  Generated AGENTS.md"
 
@@ -662,6 +721,7 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
   except IOError as e:
     result.success = false
     result.message = "Failed to write config.toml: " & e.msg
+    cleanupOnFailure(state)
     return
   log("Updated config.toml", opts.verbose)
 
@@ -685,6 +745,7 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
   if not saveConfig(gsdConfig, gsdDir):
     result.success = false
     result.message = "Failed to write gsd-config.json"
+    cleanupOnFailure(state)
     return
 
   result.success = true
@@ -717,6 +778,9 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
 
   result.configDir = gsdDir
 
+  # Capture pre-install state for rollback
+  var state = capturePreInstallState(gsdDir, toolDir)
+
   # Create directories if needed
   for dir in [gsdDir, toolDir]:
     if not dirExists(dir):
@@ -725,6 +789,7 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
       except OSError as e:
         result.success = false
         result.message = "Failed to create directory: " & e.msg
+        cleanupOnFailure(state)
         return
 
   echo "Installing GSD to ", gsdDir, " + ", toolDir, "..."
@@ -745,6 +810,7 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
     if not installSharedResources(gsdSource, gsdDir, installTypeStr, gsdDir, opts.verbose):
       result.success = false
       result.message = "Failed to copy gsd resources"
+      cleanupOnFailure(state)
       return
     echo "  Installed shared resources to ", gsdDir
 
@@ -752,6 +818,7 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
   if not writeVersionFile(gsdDir):
     result.success = false
     result.message = "Failed to write VERSION file"
+    cleanupOnFailure(state)
     return
 
   # Create cache in .gsd/
@@ -772,6 +839,7 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
     if not copyResourceDirWithRewrite(commandsSource, commandsDir, installTypeStr, gsdDir, opts.verbose):
       result.success = false
       result.message = "Failed to copy commands"
+      cleanupOnFailure(state)
       return
     echo "  Installed commands/gsd"
 
@@ -782,11 +850,14 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
     if not installGsdAgents(agentsSource, agentsDir, installTypeStr, gsdDir, opts.verbose):
       result.success = false
       result.message = "Failed to install agents"
+      cleanupOnFailure(state)
       return
     echo "  Installed agents"
 
-  # Update settings.json (in tool dir)
+  # Backup settings.json before merging (for rollback)
   let settingsPath = toolDir / "settings.json"
+  state.settingsBackupPath = backupSettings(settingsPath)
+
   var settings = loadSettings(settingsPath)
 
   let (gsdBinaryPath, gsdNotFound) = findGsdBinary()
@@ -821,6 +892,7 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
   except IOError as e:
     result.success = false
     result.message = "Failed to write settings.json: " & e.msg
+    cleanupOnFailure(state)
     return
 
   # Cleanup old files from tool dir
@@ -846,7 +918,15 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
   if not saveConfig(gsdConfig, gsdDir):
     result.success = false
     result.message = "Failed to write gsd-config.json"
+    cleanupOnFailure(state)
     return
+
+  # Success — remove settings backup
+  if state.settingsBackupPath.len > 0 and fileExists(state.settingsBackupPath):
+    try:
+      removeFile(state.settingsBackupPath)
+    except OSError:
+      discard
 
   result.success = true
   result.message = "Installation complete"

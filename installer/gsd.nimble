@@ -23,3 +23,28 @@ task format, "Format source with nimpretty":
   for f in listFiles("src") & listFiles("tests"):
     if f.endsWith(".nim"):
       exec "nimpretty --maxLineLen:100 " & f
+
+task check, "Run format check, build, and tests":
+  # Format check (diff-based, non-destructive)
+  var failed = false
+  for f in listFiles("src") & listFiles("tests"):
+    if f.endsWith(".nim"):
+      cpFile(f, f & ".bak")
+      let (fmtOut, fmtCode) = gorgeEx("nimpretty --maxLineLen:100 " & f)
+      if fmtCode != 0:
+        echo "nimpretty failed on: " & f
+        failed = true
+      else:
+        let (_, diffCode) = gorgeEx("diff -q " & f & " " & f & ".bak")
+        if diffCode != 0:
+          echo "Not formatted: " & f
+          failed = true
+      mvFile(f & ".bak", f)
+  if failed:
+    echo "Format check failed. Run 'nimble format' to fix."
+    quit(1)
+  echo "Format check passed."
+  # Build
+  exec "nimble build -y"
+  # Tests
+  exec "nimble test -y"

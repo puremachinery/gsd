@@ -10,6 +10,8 @@ const
   CacheFileName = "gsd-update-check.json"
   CacheTtlHours = 24
   HttpTimeoutMs = 3000 # 3 seconds - fast-fail for session start hook
+  MaxRetries = 1       # 1 retry = 2 total attempts
+  RetryDelayMs = 500
 
 type
   UpdateCheckResult* = object
@@ -21,7 +23,7 @@ type
 proc getCachePath(configDir: string): string =
   result = getGsdCacheDir(configDir) / CacheFileName
 
-proc isCacheValid(cachePath: string): bool =
+proc isCacheValid*(cachePath: string): bool =
   ## Check if cache exists and is less than CacheTtlHours old
   if not fileExists(cachePath):
     return false
@@ -41,7 +43,7 @@ proc isCacheValid(cachePath: string): bool =
 
   return false
 
-proc loadCachedResult(cachePath: string): Option[UpdateCheckResult] =
+proc loadCachedResult*(cachePath: string): Option[UpdateCheckResult] =
   ## Load cached update check result
   if not fileExists(cachePath):
     return none(UpdateCheckResult)
@@ -60,7 +62,7 @@ proc loadCachedResult(cachePath: string): Option[UpdateCheckResult] =
   except CatchableError:
     return none(UpdateCheckResult)
 
-proc loadCachedEtag(cachePath: string): string =
+proc loadCachedEtag*(cachePath: string): string =
   ## Load cached ETag for conditional requests
   if not fileExists(cachePath):
     return ""
@@ -71,7 +73,7 @@ proc loadCachedEtag(cachePath: string): string =
   except CatchableError:
     return ""
 
-proc saveCacheResult(cachePath: string, result: UpdateCheckResult, etag: string = "") =
+proc saveCacheResult*(cachePath: string, result: UpdateCheckResult, etag: string = "") =
   ## Save update check result to cache
   let cacheDir = parentDir(cachePath)
   if not dirExists(cacheDir):
@@ -133,56 +135,61 @@ type
 proc fetchLatestRelease(cachedEtag: string = ""): Option[FetchResult] =
   ## Fetch latest release info from GitHub API
   ## Uses ETag for conditional requests to reduce rate limit usage
-  let client = newHttpClient(timeout = HttpTimeoutMs)
-  defer: client.close()
+  ## Retries once on network/timeout errors (not on HTTP 4xx/5xx)
+  for attempt in 0..MaxRetries:
+    let client = newHttpClient(timeout = HttpTimeoutMs)
+    defer: client.close()
 
-  client.headers = newHttpHeaders({
-    "User-Agent": UserAgent,
-    "Accept": "application/vnd.github.v3+json"
-  })
+    client.headers = newHttpHeaders({
+      "User-Agent": UserAgent,
+      "Accept": "application/vnd.github.v3+json"
+    })
 
-  # Add auth if available
-  let token = getEnv("GITHUB_TOKEN")
-  if token.len > 0:
-    client.headers["Authorization"] = "Bearer " & token
+    # Add auth if available
+    let token = getEnv("GITHUB_TOKEN")
+    if token.len > 0:
+      client.headers["Authorization"] = "Bearer " & token
 
-  # Add ETag for conditional request (304 Not Modified saves rate limit)
-  if cachedEtag.len > 0:
-    client.headers["If-None-Match"] = cachedEtag
+    # Add ETag for conditional request (304 Not Modified saves rate limit)
+    if cachedEtag.len > 0:
+      client.headers["If-None-Match"] = cachedEtag
 
-  try:
-    let response = client.get(GitHubApiUrl)
+    try:
+      let response = client.get(GitHubApiUrl)
 
-    # 304 Not Modified - cache is still valid
-    if response.status == "304" or response.status.startsWith("304"):
-      return some(FetchResult(notModified: true))
+      # 304 Not Modified - cache is still valid
+      if response.status == "304" or response.status.startsWith("304"):
+        return some(FetchResult(notModified: true))
 
-    if response.status == "404" or response.status.startsWith("404"):
-      # No releases published yet
+      if response.status == "404" or response.status.startsWith("404"):
+        # No releases published yet — definitive, don't retry
+        return none(FetchResult)
+
+      if not response.status.startsWith("2"):
+        # HTTP error (rate limit, server error, etc.) — definitive, don't retry
+        return none(FetchResult)
+
+      let json = parseJson(response.body)
+      let tagName = json["tag_name"].getStr()
+      let htmlUrl = json["html_url"].getStr()
+
+      # Extract ETag from response headers for future conditional requests
+      var newEtag = ""
+      if response.headers.hasKey("ETag"):
+        newEtag = response.headers["ETag"]
+
+      return some(FetchResult(
+        version: tagName,
+        url: htmlUrl,
+        etag: newEtag,
+        notModified: false
+      ))
+    except CatchableError:
+      # Network error, timeout, parse error — retry if attempts remain
+      if attempt < MaxRetries:
+        sleep(RetryDelayMs)
+        continue
       return none(FetchResult)
-
-    if not response.status.startsWith("2"):
-      # API error (rate limit, server error, etc.) - fail silently
-      return none(FetchResult)
-
-    let json = parseJson(response.body)
-    let tagName = json["tag_name"].getStr()
-    let htmlUrl = json["html_url"].getStr()
-
-    # Extract ETag from response headers for future conditional requests
-    var newEtag = ""
-    if response.headers.hasKey("ETag"):
-      newEtag = response.headers["ETag"]
-
-    return some(FetchResult(
-      version: tagName,
-      url: htmlUrl,
-      etag: newEtag,
-      notModified: false
-    ))
-  except CatchableError:
-    # Network error, timeout, parse error - fail silently
-    return none(FetchResult)
 
 proc checkForUpdate*(configDir: string = "", forceCheck: bool = false): Option[UpdateCheckResult] =
   ## Check for updates, using cache if valid
@@ -293,36 +300,6 @@ proc runCheckUpdate*(silent: bool = true, configDir: string = "") =
         echo "Run 'gsd update' or visit: ", releaseUrl
       elif currentVersion.len > 0:
         echo "GSD is up to date (", currentVersion, ")"
-
-proc runUpdateAll*(sourceDir: string, verbose: bool = false): bool =
-  ## Update all installed platforms
-  ## Returns true if all updates succeeded
-  let installed = findInstalledPlatforms()
-
-  if installed.len == 0:
-    echo "No GSD installation found."
-    return false
-
-  var allSuccess = true
-
-  # Import install module dynamically to avoid circular deps
-  # We'll call install() for each platform
-  for plat in installed:
-    let found = findConfigDir(plat)
-    if found.isNone:
-      continue
-
-    echo "Updating ", $plat, "..."
-
-    # Clear cache for this platform
-    let cachePath = found.get() / CacheDirName / CacheFileName
-    if fileExists(cachePath):
-      try:
-        removeFile(cachePath)
-      except OSError:
-        discard
-
-  return allSuccess
 
 proc clearUpdateCache*(configDir: string = "") =
   ## Clear the update cache (called after update)

@@ -572,3 +572,213 @@ command = "my-custom-hook"
     if dirExists(toolDir / "prompts"):
       for kind, path in walkDir(toolDir / "prompts"):
         check not extractFilename(path).startsWith("gsd-")
+
+suite "Claude Code install integration":
+  test "full Claude Code install creates expected structure":
+    let originalDir = getCurrentDir()
+    let tempWork = getTempDir() / "gsd_test_claude_install"
+    let tempHome = getTempDir() / "gsd_test_claude_install_home"
+    let sourceDir = getTempDir() / "gsd_test_claude_source"
+
+    createDir(tempWork)
+    createDir(tempHome)
+
+    # Create source structure
+    createDir(sourceDir / "gsd" / "templates")
+    createDir(sourceDir / "gsd" / "workflows")
+    createDir(sourceDir / "commands" / "gsd")
+    createDir(sourceDir / "agents")
+
+    writeFile(sourceDir / "gsd" / "templates" / "plan.md",
+        "# Plan template\nPath: @~/.gsd/")
+    writeFile(sourceDir / "gsd" / "workflows" / "exec.md", "# Workflow")
+    writeFile(sourceDir / "commands" / "gsd" / "help.md",
+        "# Help command\nSee ~/.gsd/")
+    writeFile(sourceDir / "commands" / "gsd" / "new-project.md",
+        "# New project")
+    writeFile(sourceDir / "agents" / "gsd-planner.md", "# Planner agent")
+    writeFile(sourceDir / "agents" / "gsd-executor.md", "# Executor agent")
+
+    let oldHome = getEnv("HOME")
+    putEnv("HOME", tempHome)
+    setCurrentDir(tempWork)
+    let resolvedWork = getCurrentDir()
+    defer:
+      setCurrentDir(originalDir)
+      if oldHome.len > 0: putEnv("HOME", oldHome) else: delEnv("HOME")
+      removeDir(tempWork)
+      removeDir(tempHome)
+      removeDir(sourceDir)
+
+    let opts = InstallOptions(
+      configDir: "",
+      installType: itLocal,
+      platform: pClaudeCode,
+      forceStatusline: false,
+      verbose: false
+    )
+
+    let result = install(sourceDir, opts)
+    let gsdDir = resolvedWork / ".gsd"
+    let toolDir = resolvedWork / ".claude"
+
+    check result.success == true
+    check result.configDir == gsdDir
+
+    # Check shared resources in .gsd/
+    check dirExists(gsdDir)
+    check dirExists(gsdDir / "templates")
+    check fileExists(gsdDir / "templates" / "plan.md")
+    check dirExists(gsdDir / "workflows")
+
+    # Check path rewriting in shared resources (local → relative .gsd/)
+    let planContent = readFile(gsdDir / "templates" / "plan.md")
+    check planContent.contains("@.gsd/")
+    check not planContent.contains("@~/.gsd/")
+
+    # Check VERSION file in .gsd/
+    check fileExists(gsdDir / "VERSION")
+
+    # Check cache directory in .gsd/
+    check dirExists(gsdDir / "cache")
+
+    # Check commands in .claude/commands/gsd/
+    check dirExists(toolDir / "commands" / "gsd")
+    check fileExists(toolDir / "commands" / "gsd" / "help.md")
+    check fileExists(toolDir / "commands" / "gsd" / "new-project.md")
+
+    # Check command content has rewritten paths
+    let helpContent = readFile(toolDir / "commands" / "gsd" / "help.md")
+    check helpContent.contains(".gsd/")
+
+    # Check agents in .claude/agents/
+    check dirExists(toolDir / "agents")
+    check fileExists(toolDir / "agents" / "gsd-planner.md")
+    check fileExists(toolDir / "agents" / "gsd-executor.md")
+
+    # Check settings.json in .claude/
+    check fileExists(toolDir / "settings.json")
+    let settingsContent = readFile(toolDir / "settings.json")
+    let settings = parseJson(settingsContent)
+    check settings.hasKey("hooks")
+    check settings.hasKey("statusLine")
+
+    # Check hooks contain GSD hook
+    let hooks = settings["hooks"]
+    check hooks.hasKey("SessionStart")
+
+    # Check statusLine has GSD statusline
+    let statusLine = settings["statusLine"]
+    check statusLine["command"].getStr().contains("#gsd")
+
+    # Check gsd-config.json in .gsd/
+    check fileExists(gsdDir / "gsd-config.json")
+    let cfg = loadConfig(gsdDir)
+    check cfg.isSome
+    check pClaudeCode in cfg.get().platforms
+
+  test "fresh install rollback removes created dirs on failure":
+    let originalDir = getCurrentDir()
+    let tempWork = getTempDir() / "gsd_test_claude_rollback"
+    let tempHome = getTempDir() / "gsd_test_claude_rollback_home"
+
+    createDir(tempWork)
+    createDir(tempHome)
+
+    let oldHome = getEnv("HOME")
+    putEnv("HOME", tempHome)
+    setCurrentDir(tempWork)
+    let resolvedWork = getCurrentDir()
+    defer:
+      setCurrentDir(originalDir)
+      if oldHome.len > 0: putEnv("HOME", oldHome) else: delEnv("HOME")
+      removeDir(tempWork)
+      removeDir(tempHome)
+
+    let gsdDir = resolvedWork / ".gsd"
+    let toolDir = resolvedWork / ".claude"
+
+    let opts = InstallOptions(
+      configDir: "",
+      installType: itLocal,
+      platform: pClaudeCode,
+      forceStatusline: false,
+      verbose: false
+    )
+
+    let sourceDir = getTempDir() / "gsd_test_rollback_src"
+    createDir(sourceDir)
+    defer: removeDir(sourceDir)
+
+    # Pre-create toolDir (simulates existing .claude/) but NOT gsdDir
+    # Place a directory where settings.json should be a file to force write failure
+    createDir(toolDir)
+    createDir(toolDir / "settings.json")
+
+    check not dirExists(gsdDir)
+    check dirExists(toolDir)
+
+    let result = install(sourceDir, opts)
+    check result.success == false
+
+    # gsdDir was freshly created by install → should be rolled back
+    check not dirExists(gsdDir)
+
+    # toolDir existed before install → should NOT be removed
+    check dirExists(toolDir)
+
+    # Clean up
+    removeDir(toolDir / "settings.json")
+
+  test "update install preserves existing dirs on failure":
+    let originalDir = getCurrentDir()
+    let tempWork = getTempDir() / "gsd_test_claude_update_rollback"
+    let tempHome = getTempDir() / "gsd_test_claude_update_home"
+    let sourceDir = getTempDir() / "gsd_test_claude_update_src"
+
+    createDir(tempWork)
+    createDir(tempHome)
+    createDir(sourceDir)
+
+    let oldHome = getEnv("HOME")
+    putEnv("HOME", tempHome)
+    setCurrentDir(tempWork)
+    let resolvedWork = getCurrentDir()
+    defer:
+      setCurrentDir(originalDir)
+      if oldHome.len > 0: putEnv("HOME", oldHome) else: delEnv("HOME")
+      removeDir(tempWork)
+      removeDir(tempHome)
+      removeDir(sourceDir)
+
+    let gsdDir = resolvedWork / ".gsd"
+    let toolDir = resolvedWork / ".claude"
+
+    # Pre-create dirs to simulate an update (both existed before)
+    createDir(gsdDir)
+    writeFile(gsdDir / "existing-file.txt", "preserve me")
+    createDir(toolDir)
+    writeFile(toolDir / "existing-file.txt", "preserve me too")
+
+    # Make settings.json a directory to cause failure
+    createDir(toolDir / "settings.json")
+
+    let opts = InstallOptions(
+      configDir: "",
+      installType: itLocal,
+      platform: pClaudeCode,
+      forceStatusline: false,
+      verbose: false
+    )
+
+    let result = install(sourceDir, opts)
+    check result.success == false
+
+    # Both dirs existed before install → should be preserved
+    check dirExists(gsdDir)
+    check dirExists(toolDir)
+    check fileExists(gsdDir / "existing-file.txt")
+    check fileExists(toolDir / "existing-file.txt")
+
+    # Clean up
+    removeDir(toolDir / "settings.json")
