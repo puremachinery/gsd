@@ -9,7 +9,7 @@ const
   UserAgent = "gsd-cli/" & Version
   CacheFileName = "gsd-update-check.json"
   CacheTtlHours = 24
-  HttpTimeoutMs = 15000 # 15 seconds - allows for slow connections
+  HttpTimeoutMs = 3000 # 3 seconds - fast-fail for session start hook
 
 type
   UpdateCheckResult* = object
