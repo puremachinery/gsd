@@ -18,3 +18,8 @@ task test, "Run tests":
   exec "nim c -r tests/test_statusline.nim"
   exec "nim c -r tests/test_update.nim"
   exec "nim c -r tests/test_cli_integration.nim"
+
+task format, "Format source with nimpretty":
+  for f in listFiles("src") & listFiles("tests"):
+    if f.endsWith(".nim"):
+      exec "nimpretty --maxLineLen:100 " & f
