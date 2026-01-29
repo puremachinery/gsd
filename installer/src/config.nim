@@ -41,7 +41,8 @@ proc expandPath*(path: string): string =
   if path == "~":
     return getHomeDir().normalizedPath
   elif path.startsWith("~/") or path.startsWith("~\\"):
-    return (getHomeDir() / path[2..^1]).normalizedPath
+    let rest = if path.len > 2: path[2 ..^ 1] else: ""
+    return (getHomeDir() / rest).normalizedPath
   elif path.startsWith("~"):
     # ~username style - not supported, return as-is
     return path
@@ -53,7 +54,8 @@ proc expandPath*(path: string): string =
       if path == "%USERPROFILE%":
         return home.normalizedPath
       elif path.len > 13 and path[13] in {'/', '\\'}:
-        return (home / path[14..^1]).normalizedPath
+        let rest = if path.len > 14: path[14 ..^ 1] else: ""
+        return (home / rest).normalizedPath
 
   return path
 
