@@ -8,7 +8,7 @@ proc isInteractive(): bool =
   ## Check if stdin is a TTY (interactive terminal)
   try:
     return isatty(stdin)
-  except:
+  except CatchableError:
     return false
 
 proc promptPlatformChoice(): PlatformChoice =
