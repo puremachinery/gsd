@@ -27,8 +27,6 @@ The system provides:
 
 **Active.** The installer is a native Nim binary; releases bundle the binary and all prompt content.
 
-**Next:** Polish Codex CLI integration and docs.
-
 ## Platforms
 
 | Platform | Status |
@@ -59,7 +57,7 @@ cd gsd-darwin-arm64
 ./gsd install --platform=codex --global
 ```
 
-Release bundles will be available for:
+Release bundles are available for:
 - macOS (Apple Silicon): `gsd-darwin-arm64.tar.gz`
 - macOS (Intel): `gsd-darwin-x64.tar.gz`
 - Linux (x64): `gsd-linux-x64.tar.gz`
@@ -92,6 +90,21 @@ GSD keeps AI assistants capable throughout large projects by:
 4. **Size-limited artifacts** — Templates enforce concise documentation
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details.
+
+## Building from Source
+
+Requires [Nim](https://nim-lang.org/) 2.0+.
+
+```bash
+git clone https://github.com/puremachinery/gsd.git
+cd gsd/installer
+nimble build          # build the binary
+nimble test           # run tests
+nimble format         # format code with nimpretty
+nimble check          # format check + build + test (used by pre-push hook)
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
 ## Attribution
 

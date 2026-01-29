@@ -24,7 +24,7 @@ type
 proc loadConfig*(configDir: string): Option[GsdConfig]
 
 const
-  Version* = "0.3.0"
+  Version* = "0.3.1"
   ConfigFileName* = "gsd-config.json"
   GsdDirName* = "gsd"
   CacheDirName* = "cache"

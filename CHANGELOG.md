@@ -8,6 +8,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.3.1] - 2026-01-28
+
+### Added
+- Install rollback on partial failure (freshly created directories removed, pre-existing directories preserved, settings.json backed up and restored)
+- GitHub API retry logic (1 retry with 500ms delay on network/timeout errors)
+- Update cache lifecycle tests (isCacheValid, loadCachedResult, saveCacheResult, ETag round-trip)
+- Claude Code install end-to-end tests (full structure verification, rollback validation)
+- Pre-push hook and `nimble check` task for local validation
+- CONTRIBUTING.md and GitHub issue template
+
+### Fixed
+- CI: install libpcre3-dev on Ubuntu for PCRE dependency
+- Shell-escape paths in hook command strings to prevent injection
+- Guard expandPath against empty slice on `~/` and `%USERPROFILE%/`
+- Use CatchableError instead of bare `except:` in isInteractive
+- HTTP timeout reduced from 15s to 3s for session start hook
+
+### Removed
+- Dead `runUpdateAll` proc (never called; real logic is in `gsd.nim:cmdUpdate`)
+
+---
+
 ## [0.3.0] - 2026-01-26
 
 ### Added
@@ -46,6 +68,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-[Unreleased]: https://github.com/puremachinery/gsd/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/puremachinery/gsd/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/puremachinery/gsd/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/puremachinery/gsd/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/puremachinery/gsd/commits/v0.2.0

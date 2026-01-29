@@ -708,6 +708,83 @@ rm -rf ~/.gsd ./.gsd ~/.claude ./.claude
 
 ---
 
+## Scenario 23: Install Rollback on Failure
+
+**Purpose:** Verify that a failed fresh install doesn't leave partial state behind.
+
+**Setup:**
+```bash
+rm -rf ~/.gsd ~/.claude
+```
+
+**Steps:**
+
+1. Create a read-only directory where `.claude/settings.json` would go:
+   ```bash
+   mkdir -p ~/.claude
+   mkdir ~/.claude/settings.json   # directory, not file — forces write failure
+   ```
+
+2. Run install:
+   ```bash
+   ./gsd install --platform=claude
+   ```
+
+3. **Expected:**
+   - Install fails with an error about settings.json
+   - `~/.gsd/` is **removed** (was freshly created, rolled back)
+   - `~/.claude/` is **preserved** (existed before install)
+   - Stderr shows: `Rolled back: removed /Users/<you>/.gsd`
+
+4. **Verify:**
+   ```bash
+   ls ~/.gsd/            # Should fail: No such file or directory
+   ls ~/.claude/         # Should exist
+   ```
+
+5. **Cleanup:**
+   ```bash
+   rm -rf ~/.claude/settings.json
+   ```
+
+**Variant (update case):** If both `~/.gsd/` and `~/.claude/` exist before the failed install, neither should be removed (prior state is still valid).
+
+---
+
+## Scenario 24: Post-Install Workflow Smoke Test
+
+**Purpose:** Verify that GSD actually works end-to-end after installation.
+
+**Setup:** Claude Code installed globally.
+
+**Steps:**
+
+1. Open Claude Code in a test project:
+   ```bash
+   mkdir /tmp/gsd-smoke-test && cd /tmp/gsd-smoke-test
+   ```
+
+2. Verify slash commands are available:
+   - Type `/gsd:help` — should show GSD help and command list
+   - Type `/gsd:status` — should report project state (no project initialized yet)
+
+3. Verify statusline is active:
+   - The Claude Code status bar should show GSD info (version, context usage)
+
+4. Verify session hook fires:
+   - Start a new session — the check-update hook should run silently
+   - Check cache was written:
+     ```bash
+     ls ~/.gsd/cache/gsd-update-check.json
+     ```
+
+5. **Cleanup:**
+   ```bash
+   rm -rf /tmp/gsd-smoke-test
+   ```
+
+---
+
 ## Edge Cases
 
 ### Invalid Platform Flag
@@ -744,3 +821,5 @@ rm ~/.gsd/VERSION
 | Non-interactive | Default Claude | - | - | Error if multiple |
 | v0.2 → v0.3 migration | Over-install | Check 1 | - | - |
 | Local + global | Install 2 | Check 2 | Update 2 | Per-scope |
+| Rollback on failure | Rolled back | - | - | - |
+| Post-install smoke | - | - | - | - |
