@@ -16,7 +16,7 @@ jobs:
           - os: macos-14
             bundle: gsd-darwin-arm64
             archive: tar.gz
-          - os: macos-13
+          - os: macos-15-large
             bundle: gsd-darwin-x64
             archive: tar.gz
           - os: ubuntu-latest
@@ -32,18 +32,22 @@ jobs:
       - name: Setup Nim
         uses: jiro4989/setup-nim-action@v2
         with:
-          nim-version: '2.0.0'
+          nim-version: 'stable'
+
+      - name: Install PCRE (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y libpcre3-dev
 
       - name: Build gsd
         run: |
           cd installer
-          nimble build -d:release --opt:size
+          nimble build -y -d:release --opt:size
 
       - name: Run tests (linux only)
         if: matrix.os == 'ubuntu-latest'
         run: |
           cd installer
-          nimble test
+          nimble test -y
 
       - name: Prepare bundle (tar.gz)
         if: matrix.archive == 'tar.gz'
@@ -52,9 +56,15 @@ jobs:
           BUNDLE="${{ matrix.bundle }}"
           rm -rf "$BUNDLE"
           mkdir -p "$BUNDLE"
-          cp installer/gsd "$BUNDLE/gsd"
-          chmod +x "$BUNDLE/gsd"
-          cp -R gsd commands agents "$BUNDLE/"
+          cp -R gsd/ "$BUNDLE/gsd/"
+          cp -R commands/ "$BUNDLE/commands/"
+          cp -R agents/ "$BUNDLE/agents/"
+          # Binary inside gsd/ avoids file/directory name conflict at bundle root
+          cp installer/gsd "$BUNDLE/gsd/gsd"
+          chmod +x "$BUNDLE/gsd/gsd"
+          # Wrapper script so users can run ./install from bundle root
+          printf '#!/bin/sh\nexec "$(dirname "$0")/gsd/gsd" "$@"\n' > "$BUNDLE/install"
+          chmod +x "$BUNDLE/install"
           tar -czf "$BUNDLE.tar.gz" "$BUNDLE"
 
       - name: Prepare bundle (zip)

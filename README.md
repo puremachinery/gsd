@@ -48,13 +48,13 @@ tar -xzf gsd-darwin-arm64.tar.gz
 cd gsd-darwin-arm64
 
 # Install globally (to ~/.claude)
-./gsd install --global
+./install --global
 
 # Or install locally (to ./.claude in current project)
-./gsd install --local
+./install --local
 
 # Install for Codex CLI (to ~/.codex)
-./gsd install --platform=codex --global
+./install --platform=codex --global
 ```
 
 Release bundles are available for:
