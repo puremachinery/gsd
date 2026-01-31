@@ -1,0 +1,52 @@
+rules:
+  # ── Hardcoded secrets ─────────────────────────────────────────
+  - id: nim-hardcoded-secret
+    patterns:
+      - pattern-regex: '(?i)(password|secret|token|api_key|apikey)\s*=\s*"[^"]+"'
+    message: >
+      Possible hardcoded secret assigned to a sensitive-looking variable.
+      Use environment variables or a config file instead.
+    languages: [generic]
+    severity: WARNING
+    paths:
+      include:
+        - "*.nim"
+
+  # ── importc usage ─────────────────────────────────────────────
+  - id: nim-importc-usage
+    patterns:
+      - pattern-regex: '\{\.importc'
+    message: >
+      importc introduces foreign C bindings — review for memory safety
+      and ensure inputs are validated.
+    languages: [generic]
+    severity: INFO
+    paths:
+      include:
+        - "*.nim"
+
+  # ── emit pragma ───────────────────────────────────────────────
+  - id: nim-emit-pragma
+    patterns:
+      - pattern-regex: '\{\.emit'
+    message: >
+      The emit pragma injects raw C/JS code — review carefully for
+      injection or undefined behaviour.
+    languages: [generic]
+    severity: WARNING
+    paths:
+      include:
+        - "*.nim"
+
+  # ── Bare except: ──────────────────────────────────────────────
+  - id: nim-bare-except
+    patterns:
+      - pattern-regex: '^\s*except\s*:'
+    message: >
+      Bare "except:" catches all exceptions including Defect.
+      Prefer "except CatchableError:" or a specific exception type.
+    languages: [generic]
+    severity: WARNING
+    paths:
+      include:
+        - "*.nim"

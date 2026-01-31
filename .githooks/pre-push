@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Pre-push hook: runs format check, build, and tests
+# Install with: git config core.hooksPath .githooks
+
+set -euo pipefail
+
+echo "Running pre-push checks..."
+
+# Secret scanning with gitleaks (skip gracefully if not installed)
+if command -v gitleaks &> /dev/null; then
+  echo "Running gitleaks secret scan..."
+  gitleaks detect --source . --no-banner
+else
+  echo "Warning: gitleaks not installed — skipping secret scan."
+  echo "  Install: brew install gitleaks  (or see https://github.com/gitleaks/gitleaks)"
+fi
+
+cd installer
+nimble check -y
+
+echo "All checks passed."

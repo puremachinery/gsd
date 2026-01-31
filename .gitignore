@@ -1,0 +1,28 @@
+node_modules/
+package-lock.json
+.DS_Store
+TO-DOS.md
+CLAUDE.md
+.planning
+/research.claude/
+
+# Local notes and private files
+.local/
+
+# Local test installs
+.claude/
+
+# Nim build artifacts
+installer/gsd
+installer/src/gsd
+installer/tests/test_config
+installer/tests/test_install
+installer/tests/test_platform
+installer/tests/test_statusline
+installer/tests/test_toml
+installer/tests/test_update
+installer/tests/test_cli_integration
+
+# AI Review System
+.review_state.yaml
+.review_history/

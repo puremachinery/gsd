@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: "stable"
+
+      - name: Install PCRE (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y libpcre3-dev
+
+      - name: Build
+        working-directory: installer
+        run: nimble build -y
+
+      - name: Test
+        working-directory: installer
+        run: nimble test -y
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: "stable"
+
+      - name: Check formatting
+        working-directory: installer
+        run: |
+          for f in src/*.nim tests/*.nim; do
+            cp "$f" "$f.bak"
+            nimpretty --maxLineLen:100 "$f"
+            if ! diff -q "$f" "$f.bak" > /dev/null 2>&1; then
+              echo "::error::$f is not formatted. Run: nimpretty --maxLineLen:100 $f"
+              diff "$f.bak" "$f" || true
+              FAILED=1
+            fi
+            mv "$f.bak" "$f"
+          done
+          if [ "${FAILED:-0}" = "1" ]; then
+            echo "::error::Format check failed. Run 'nimble format' to fix."
+            exit 1
+          fi
