@@ -50,6 +50,9 @@ cd gsd-darwin-arm64
 # Install globally (to ~/.claude)
 ./install --global
 
+# Preview changes without writing files
+./install --platform=both --dry-run
+
 # Or install locally (to ./.claude in current project)
 ./install --local
 
@@ -61,6 +64,23 @@ Release bundles are available for:
 - macOS (Apple Silicon — also runs on Intel via Rosetta 2): `gsd-darwin-arm64.tar.gz`
 - Linux (x64): `gsd-linux-x64.tar.gz`
 - Windows (x64): `gsd-windows-x64.zip`
+
+### Windows Quickstart (PowerShell)
+
+```powershell
+# Extract the release bundle
+Expand-Archive .\gsd-windows-x64.zip -DestinationPath .
+Set-Location .\gsd-windows-x64
+
+# Install globally (to %USERPROFILE%\.claude)
+.\gsd.exe install --global
+
+# Preview changes without writing files
+.\gsd.exe install --platform=both --dry-run
+
+# Install for Codex CLI (to %USERPROFILE%\.codex)
+.\gsd.exe install --platform=codex --global
+```
 
 Each bundle contains:
 - `gsd` binary (or `gsd.exe` on Windows)

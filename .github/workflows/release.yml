@@ -80,6 +80,35 @@ jobs:
           Copy-Item agents -Recurse -Destination "$bundle\agents"
           Compress-Archive -Path "$bundle\*" -DestinationPath "$bundle.zip"
 
+      - name: Smoke test bundle (tar.gz)
+        if: matrix.archive == 'tar.gz'
+        run: |
+          set -euo pipefail
+          BUNDLE="${{ matrix.bundle }}"
+          WORKDIR="$(mktemp -d)"
+          HOME_DIR="$(mktemp -d)"
+          tar -xzf "$BUNDLE.tar.gz" -C "$WORKDIR"
+          cd "$WORKDIR/$BUNDLE"
+          ./gsd/gsd --version
+          HOME="$HOME_DIR" ./gsd/gsd install --platform=claude --global --dry-run
+          HOME="$HOME_DIR" ./gsd/gsd install --platform=codex --global --dry-run
+
+      - name: Smoke test bundle (zip)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $bundle = "${{ matrix.bundle }}"
+          $work = Join-Path $env:RUNNER_TEMP "gsd-smoke"
+          if (Test-Path $work) { Remove-Item -Recurse -Force $work }
+          New-Item -ItemType Directory -Force -Path $work | Out-Null
+          Expand-Archive -Path "$bundle.zip" -DestinationPath $work
+          $home = Join-Path $work "home"
+          New-Item -ItemType Directory -Force -Path $home | Out-Null
+          $env:USERPROFILE = $home
+          & (Join-Path $work "gsd.exe") --version
+          & (Join-Path $work "gsd.exe") install --platform=claude --global --dry-run
+          & (Join-Path $work "gsd.exe") install --platform=codex --global --dry-run
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

@@ -356,3 +356,94 @@ suite "CLI integration":
     # Existing global install should remain untouched
     check fileExists(globalGsd / ConfigFileName)
     check fileExists(globalClaude / "commands" / "gsd" / "help.md")
+
+  test "install --dry-run previews changes without writing files":
+    let bin = buildGsdBinary()
+    let workDir = prepareWorkspace()
+    let tempHome = getTempDir() / ("gsd_cli_install_dryrun_" & $epochTime().int)
+    createDir(tempHome)
+
+    let oldHome = getEnv("HOME")
+    let oldEnv = getEnv(ConfigEnvVar)
+    putEnv("HOME", tempHome)
+    clearEnvVar(ConfigEnvVar)
+    defer:
+      if oldHome.len > 0: putEnv("HOME", oldHome) else: delEnv("HOME")
+      if oldEnv.len > 0: putEnv(ConfigEnvVar, oldEnv) else: delEnv(ConfigEnvVar)
+      removeDir(workDir)
+      removeDir(tempHome)
+
+    let output = execProcess(
+      bin,
+      args = @["install", "--platform=claude", "--global", "--dry-run"],
+      options = {poUsePath, poStdErrToStdOut},
+      workingDir = workDir
+    )
+
+    check output.contains("[dry-run] Would install GSD")
+    check output.contains("Dry run complete. No files were modified.")
+    check not dirExists(tempHome / ".gsd")
+    check not dirExists(tempHome / ".claude")
+
+  test "uninstall --dry-run preserves installation files":
+    let bin = buildGsdBinary()
+    let workDir = prepareWorkspace()
+    let tempHome = getTempDir() / ("gsd_cli_uninstall_dryrun_" & $epochTime().int)
+    createDir(tempHome)
+
+    let globalGsd = tempHome / ".gsd"
+    let globalClaude = tempHome / ".claude"
+    seedMinimalInstall(globalGsd, @[pClaudeCode], itGlobal)
+    createDir(globalClaude / "commands" / "gsd")
+    writeFile(globalClaude / "commands" / "gsd" / "help.md", "# Help")
+
+    let oldHome = getEnv("HOME")
+    let oldEnv = getEnv(ConfigEnvVar)
+    putEnv("HOME", tempHome)
+    clearEnvVar(ConfigEnvVar)
+    defer:
+      if oldHome.len > 0: putEnv("HOME", oldHome) else: delEnv("HOME")
+      if oldEnv.len > 0: putEnv(ConfigEnvVar, oldEnv) else: delEnv(ConfigEnvVar)
+      removeDir(workDir)
+      removeDir(tempHome)
+
+    let output = execProcess(
+      bin,
+      args = @["uninstall", "--platform=claude", "--global", "--dry-run"],
+      options = {poUsePath, poStdErrToStdOut},
+      workingDir = workDir
+    )
+
+    check output.contains("[dry-run] Would uninstall GSD")
+    check fileExists(globalGsd / ConfigFileName)
+    check fileExists(globalClaude / "commands" / "gsd" / "help.md")
+
+  test "update --dry-run previews without mutating installation":
+    let bin = buildGsdBinary()
+    let workDir = prepareWorkspace()
+    let tempHome = getTempDir() / ("gsd_cli_update_dryrun_" & $epochTime().int)
+    createDir(tempHome)
+
+    let localGsd = workDir / ".gsd"
+    seedMinimalInstall(localGsd, @[pClaudeCode], itLocal)
+
+    let oldHome = getEnv("HOME")
+    let oldEnv = getEnv(ConfigEnvVar)
+    putEnv("HOME", tempHome)
+    clearEnvVar(ConfigEnvVar)
+    defer:
+      if oldHome.len > 0: putEnv("HOME", oldHome) else: delEnv("HOME")
+      if oldEnv.len > 0: putEnv(ConfigEnvVar, oldEnv) else: delEnv(ConfigEnvVar)
+      removeDir(workDir)
+      removeDir(tempHome)
+
+    let output = execProcess(
+      bin,
+      args = @["update", "--platform=claude", "--dry-run"],
+      options = {poUsePath, poStdErrToStdOut},
+      workingDir = workDir
+    )
+
+    check output.contains("[dry-run] Would install GSD")
+    check output.contains("Dry run complete. No files were modified.")
+    check not dirExists(workDir / ".claude" / "commands" / "gsd")

@@ -90,15 +90,18 @@ Install options:
   -l, --local               Install to ./.<platform>
   -c, --config-dir <path>   Custom config directory
   -p, --platform <name>     Target: claude, codex, or both
+  --dry-run                 Preview changes without writing files
   --force-statusline        Replace existing statusline (Claude only)
   --verbose                 Verbose output
 
 Other options:
+  --dry-run                 Also supported by uninstall and update
   -h, --help                Show this help
   -v, --version             Show version
 
 Examples:
   gsd install                       Interactive platform selection
+  gsd install --dry-run             Preview installation changes
   gsd install --platform=both       Install for both platforms
   gsd install --platform=codex      Install for Codex CLI only
   gsd update                        Update all installed platforms
@@ -139,7 +142,8 @@ proc cmdInstall(args: seq[string]) =
     installType: itGlobal,
     platform: pClaudeCode,
     forceStatusline: false,
-    verbose: false
+    verbose: false,
+    dryRun: false
   )
 
   var platformExplicit = false
@@ -148,7 +152,7 @@ proc cmdInstall(args: seq[string]) =
   var p = initOptParser(
     args,
     shortNoVal = {'g', 'l', 'h'},
-    longNoVal = @["global", "local", "force-statusline", "verbose", "help"]
+    longNoVal = @["global", "local", "force-statusline", "verbose", "dry-run", "help"]
   )
   while true:
     p.next()
@@ -174,6 +178,8 @@ proc cmdInstall(args: seq[string]) =
         baseOpts.forceStatusline = true
       of "verbose":
         baseOpts.verbose = true
+      of "dry-run":
+        baseOpts.dryRun = true
       of "h", "help":
         echo "Usage: gsd install [options]"
         echo ""
@@ -182,6 +188,7 @@ proc cmdInstall(args: seq[string]) =
         echo "  -l, --local               Install to ./.<platform>"
         echo "  -c, --config-dir <path>   Custom config directory"
         echo "  -p, --platform <name>     Target: claude, codex, or both"
+        echo "  --dry-run                 Preview changes without writing files"
         echo "  --force-statusline        Replace existing statusline (Claude only)"
         echo "  --verbose                 Verbose output"
         quit(0)
@@ -233,12 +240,15 @@ proc cmdInstall(args: seq[string]) =
   # Show summary
   if installedPlatforms.len > 0:
     echo ""
-    for p in installedPlatforms:
-      case p
-      of pClaudeCode:
-        echo "Claude Code: Use /gsd:help to get started."
-      of pCodexCli:
-        echo "Codex CLI: Use /prompts:gsd-help to get started."
+    if baseOpts.dryRun:
+      echo "Dry run complete. No files were modified."
+    else:
+      for p in installedPlatforms:
+        case p
+        of pClaudeCode:
+          echo "Claude Code: Use /gsd:help to get started."
+        of pCodexCli:
+          echo "Codex CLI: Use /prompts:gsd-help to get started."
 
   if not allSuccess:
     quit(1)
@@ -246,6 +256,7 @@ proc cmdInstall(args: seq[string]) =
 proc cmdUninstall(args: seq[string]) =
   var configDir = ""
   var verbose = false
+  var dryRun = false
   var platformChoice = pcClaude
   var platformExplicit = false
   var useGlobal = false
@@ -255,8 +266,8 @@ proc cmdUninstall(args: seq[string]) =
   # First pass: parse all flags
   var p = initOptParser(
     args,
-    shortNoVal = {'g', 'l'},
-    longNoVal = @["global", "local", "all", "verbose"]
+    shortNoVal = {'g', 'l', 'h'},
+    longNoVal = @["global", "local", "all", "verbose", "dry-run", "help"]
   )
   while true:
     p.next()
@@ -285,6 +296,20 @@ proc cmdUninstall(args: seq[string]) =
         uninstallAll = true
       of "verbose":
         verbose = true
+      of "dry-run":
+        dryRun = true
+      of "h", "help":
+        echo "Usage: gsd uninstall [options]"
+        echo ""
+        echo "Options:"
+        echo "  -g, --global              Target global install (~/.gsd)"
+        echo "  -l, --local               Target local install (./.gsd)"
+        echo "  -c, --config-dir <path>   Target specific .gsd directory"
+        echo "  -p, --platform <name>     Target: claude, codex, or both"
+        echo "  --all                     Uninstall all detected installations"
+        echo "  --dry-run                 Preview changes without writing files"
+        echo "  --verbose                 Verbose output"
+        quit(0)
       else:
         discard
     of cmdArgument:
@@ -312,12 +337,12 @@ proc cmdUninstall(args: seq[string]) =
           stderr.writeLine "Error: ", $targetPlatform, " not found in ", ConfigFileName, "."
           allSuccess = false
           continue
-        if not uninstall(configDir, verbose, targetPlatform):
+        if not uninstall(configDir, verbose, targetPlatform, dryRun):
           allSuccess = false
     else:
       # Uninstall all platforms listed in config
       for p in cfg.get().platforms:
-        if not uninstall(configDir, verbose, p):
+        if not uninstall(configDir, verbose, p, dryRun):
           allSuccess = false
 
     if not allSuccess:
@@ -332,7 +357,7 @@ proc cmdUninstall(args: seq[string]) =
       quit(1)
 
     for install in installed:
-      discard uninstall(install.dir, verbose, install.platform)
+      discard uninstall(install.dir, verbose, install.platform, dryRun)
     return
 
   # Handle explicit platform choice (may include "both")
@@ -369,7 +394,7 @@ proc cmdUninstall(args: seq[string]) =
       quit(1)
 
     for target in targets:
-      discard uninstall(target.dir, verbose, target.platform)
+      discard uninstall(target.dir, verbose, target.platform, dryRun)
     return
 
   # No explicit options - check what's installed
@@ -382,14 +407,14 @@ proc cmdUninstall(args: seq[string]) =
   # If only one platform installed, uninstall it
   if installed.len == 1:
     let install = installed[0]
-    discard uninstall(install.dir, verbose, install.platform)
+    discard uninstall(install.dir, verbose, install.platform, dryRun)
     return
 
   # Multiple platforms installed - prompt if interactive
   if isInteractive():
     let toUninstall = promptUninstallChoice(installed)
     for install in toUninstall:
-      discard uninstall(install.dir, verbose, install.platform)
+      discard uninstall(install.dir, verbose, install.platform, dryRun)
   else:
     # Non-interactive with multiple platforms - require explicit choice
     stderr.writeLine "Error: Multiple GSD installations found. Specify --platform or --all."
@@ -820,12 +845,13 @@ proc cmdStatusline(args: seq[string]) =
 proc cmdUpdate(args: seq[string]) =
   ## Update GSD for all installed platforms
   var verbose = false
+  var dryRun = false
   var platformChoice: Option[PlatformChoice] = none(PlatformChoice)
 
   var p = initOptParser(
     args,
     shortNoVal = {'h'},
-    longNoVal = @["verbose", "help"]
+    longNoVal = @["verbose", "dry-run", "help"]
   )
   while true:
     p.next()
@@ -841,6 +867,8 @@ proc cmdUpdate(args: seq[string]) =
           quit(1)
       of "verbose":
         verbose = true
+      of "dry-run":
+        dryRun = true
       of "h", "help":
         echo "Usage: gsd update [options]"
         echo ""
@@ -848,6 +876,7 @@ proc cmdUpdate(args: seq[string]) =
         echo ""
         echo "Options:"
         echo "  -p, --platform <name>     Target: claude, codex, or both"
+        echo "  --dry-run                 Preview changes without writing files"
         echo "  --verbose                 Verbose output"
         quit(0)
       else:
@@ -867,9 +896,13 @@ proc cmdUpdate(args: seq[string]) =
   # Detect and migrate legacy v0.2 installs
   let legacyConfigs = detectLegacyInstall()
   if legacyConfigs.len > 0:
-    if not migrateLegacyInstall(legacyConfigs, verbose):
-      stderr.writeLine "Error: Legacy migration failed."
-      quit(1)
+    if dryRun:
+      echo "[dry-run] Would migrate ", legacyConfigs.len,
+          " legacy v0.2 installation(s) to .gsd/ layout before update."
+    else:
+      if not migrateLegacyInstall(legacyConfigs, verbose):
+        stderr.writeLine "Error: Legacy migration failed."
+        quit(1)
 
   # Determine which platforms to update
   let installed = listInstalledConfigs()
@@ -906,7 +939,8 @@ proc cmdUpdate(args: seq[string]) =
       installType: if cfg.isSome: cfg.get().installType else: inferInstallType(target.dir),
       platform: target.platform,
       forceStatusline: false,
-      verbose: verbose
+      verbose: verbose,
+      dryRun: dryRun
     )
 
     # If it was a custom install, preserve the path
@@ -919,7 +953,8 @@ proc cmdUpdate(args: seq[string]) =
     let result = install(sourceDir, opts)
 
     if result.success:
-      clearUpdateCache(target.dir)
+      if not dryRun:
+        clearUpdateCache(target.dir)
     else:
       stderr.writeLine "Error updating ", $target.platform, ": ", result.message
       allSuccess = false
@@ -929,7 +964,10 @@ proc cmdUpdate(args: seq[string]) =
 
   if allSuccess:
     echo ""
-    echo "Update complete!"
+    if dryRun:
+      echo "Dry run complete. No files were modified."
+    else:
+      echo "Update complete!"
   else:
     quit(1)
 
