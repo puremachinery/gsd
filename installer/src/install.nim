@@ -1072,8 +1072,8 @@ proc uninstallCodex*(gsdDir: string, verbose: bool): bool =
       else:
         writeFile(agentsMdFile, cleanedContent)
         log("Updated: " & agentsMdFile, verbose)
-    except OSError:
-      discard
+    except OSError as e:
+      stderr.writeLine "Warning: Could not remove AGENTS.md: ", e.msg
     except IOError:
       stderr.writeLine "Warning: Could not update AGENTS.md"
 
