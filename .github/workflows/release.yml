@@ -78,7 +78,8 @@ jobs:
           Copy-Item gsd -Recurse -Destination "$bundle\gsd"
           Copy-Item commands -Recurse -Destination "$bundle\commands"
           Copy-Item agents -Recurse -Destination "$bundle\agents"
-          Compress-Archive -Path "$bundle\*" -DestinationPath "$bundle.zip"
+          # Zip the bundle directory itself so extraction creates a stable root folder.
+          Compress-Archive -Path $bundle -DestinationPath "$bundle.zip"
 
       - name: Smoke test bundle (tar.gz)
         if: matrix.archive == 'tar.gz'
@@ -102,12 +103,13 @@ jobs:
           if (Test-Path $work) { Remove-Item -Recurse -Force $work }
           New-Item -ItemType Directory -Force -Path $work | Out-Null
           Expand-Archive -Path "$bundle.zip" -DestinationPath $work
+          $bundleRoot = Join-Path $work $bundle
           $home = Join-Path $work "home"
           New-Item -ItemType Directory -Force -Path $home | Out-Null
           $env:USERPROFILE = $home
-          & (Join-Path $work "gsd.exe") --version
-          & (Join-Path $work "gsd.exe") install --platform=claude --global --dry-run
-          & (Join-Path $work "gsd.exe") install --platform=codex --global --dry-run
+          & (Join-Path $bundleRoot "gsd.exe") --version
+          & (Join-Path $bundleRoot "gsd.exe") install --platform=claude --global --dry-run
+          & (Join-Path $bundleRoot "gsd.exe") install --platform=codex --global --dry-run
 
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

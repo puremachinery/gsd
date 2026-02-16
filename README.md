@@ -68,7 +68,7 @@ Release bundles are available for:
 ### Windows Quickstart (PowerShell)
 
 ```powershell
-# Extract the release bundle
+# Extract the release bundle (creates .\gsd-windows-x64\)
 Expand-Archive .\gsd-windows-x64.zip -DestinationPath .
 Set-Location .\gsd-windows-x64
 

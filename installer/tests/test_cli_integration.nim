@@ -90,6 +90,34 @@ proc clearEnvVar(key: string) =
   if getEnv(key).len > 0:
     delEnv(key)
 
+type
+  HomeSandbox = object
+    tempHome: string
+    oldHome: string
+    oldConfigEnv: string
+
+proc setupHomeSandbox(prefix: string): HomeSandbox =
+  result.tempHome = getTempDir() / (prefix & $epochTime().int)
+  createDir(result.tempHome)
+  result.oldHome = getEnv("HOME")
+  result.oldConfigEnv = getEnv(ConfigEnvVar)
+  putEnv("HOME", result.tempHome)
+  clearEnvVar(ConfigEnvVar)
+
+proc teardownHomeSandbox(sandbox: HomeSandbox) =
+  if sandbox.oldHome.len > 0:
+    putEnv("HOME", sandbox.oldHome)
+  else:
+    delEnv("HOME")
+
+  if sandbox.oldConfigEnv.len > 0:
+    putEnv(ConfigEnvVar, sandbox.oldConfigEnv)
+  else:
+    delEnv(ConfigEnvVar)
+
+  if dirExists(sandbox.tempHome):
+    removeDir(sandbox.tempHome)
+
 suite "CLI integration":
   test "update --platform=claude updates local and global installs":
     let bin = buildGsdBinary()
@@ -360,18 +388,11 @@ suite "CLI integration":
   test "install --dry-run previews changes without writing files":
     let bin = buildGsdBinary()
     let workDir = prepareWorkspace()
-    let tempHome = getTempDir() / ("gsd_cli_install_dryrun_" & $epochTime().int)
-    createDir(tempHome)
-
-    let oldHome = getEnv("HOME")
-    let oldEnv = getEnv(ConfigEnvVar)
-    putEnv("HOME", tempHome)
-    clearEnvVar(ConfigEnvVar)
+    let sandbox = setupHomeSandbox("gsd_cli_install_dryrun_")
+    let tempHome = sandbox.tempHome
     defer:
-      if oldHome.len > 0: putEnv("HOME", oldHome) else: delEnv("HOME")
-      if oldEnv.len > 0: putEnv(ConfigEnvVar, oldEnv) else: delEnv(ConfigEnvVar)
       removeDir(workDir)
-      removeDir(tempHome)
+      teardownHomeSandbox(sandbox)
 
     let output = execProcess(
       bin,
@@ -388,8 +409,8 @@ suite "CLI integration":
   test "uninstall --dry-run preserves installation files":
     let bin = buildGsdBinary()
     let workDir = prepareWorkspace()
-    let tempHome = getTempDir() / ("gsd_cli_uninstall_dryrun_" & $epochTime().int)
-    createDir(tempHome)
+    let sandbox = setupHomeSandbox("gsd_cli_uninstall_dryrun_")
+    let tempHome = sandbox.tempHome
 
     let globalGsd = tempHome / ".gsd"
     let globalClaude = tempHome / ".claude"
@@ -397,15 +418,9 @@ suite "CLI integration":
     createDir(globalClaude / "commands" / "gsd")
     writeFile(globalClaude / "commands" / "gsd" / "help.md", "# Help")
 
-    let oldHome = getEnv("HOME")
-    let oldEnv = getEnv(ConfigEnvVar)
-    putEnv("HOME", tempHome)
-    clearEnvVar(ConfigEnvVar)
     defer:
-      if oldHome.len > 0: putEnv("HOME", oldHome) else: delEnv("HOME")
-      if oldEnv.len > 0: putEnv(ConfigEnvVar, oldEnv) else: delEnv(ConfigEnvVar)
       removeDir(workDir)
-      removeDir(tempHome)
+      teardownHomeSandbox(sandbox)
 
     let output = execProcess(
       bin,
@@ -421,21 +436,14 @@ suite "CLI integration":
   test "update --dry-run previews without mutating installation":
     let bin = buildGsdBinary()
     let workDir = prepareWorkspace()
-    let tempHome = getTempDir() / ("gsd_cli_update_dryrun_" & $epochTime().int)
-    createDir(tempHome)
+    let sandbox = setupHomeSandbox("gsd_cli_update_dryrun_")
 
     let localGsd = workDir / ".gsd"
     seedMinimalInstall(localGsd, @[pClaudeCode], itLocal)
 
-    let oldHome = getEnv("HOME")
-    let oldEnv = getEnv(ConfigEnvVar)
-    putEnv("HOME", tempHome)
-    clearEnvVar(ConfigEnvVar)
     defer:
-      if oldHome.len > 0: putEnv("HOME", oldHome) else: delEnv("HOME")
-      if oldEnv.len > 0: putEnv(ConfigEnvVar, oldEnv) else: delEnv(ConfigEnvVar)
       removeDir(workDir)
-      removeDir(tempHome)
+      teardownHomeSandbox(sandbox)
 
     let output = execProcess(
       bin,

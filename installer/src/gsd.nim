@@ -116,6 +116,52 @@ proc showVersion() =
   echo "gsd ", Version
   quit(0)
 
+proc echoPlatformOption() =
+  echo "  -p, --platform <name>     Target: claude, codex, or both"
+
+proc echoDryRunOption() =
+  echo "  --dry-run                 Preview changes without writing files"
+
+proc echoVerboseOption() =
+  echo "  --verbose                 Verbose output"
+
+proc showInstallCommandHelp() =
+  echo "Usage: gsd install [options]"
+  echo ""
+  echo "Options:"
+  echo "  -g, --global              Install to ~/.<platform> (default)"
+  echo "  -l, --local               Install to ./.<platform>"
+  echo "  -c, --config-dir <path>   Custom config directory"
+  echoPlatformOption()
+  echoDryRunOption()
+  echo "  --force-statusline        Replace existing statusline (Claude only)"
+  echoVerboseOption()
+  quit(0)
+
+proc showUninstallCommandHelp() =
+  echo "Usage: gsd uninstall [options]"
+  echo ""
+  echo "Options:"
+  echo "  -g, --global              Target global install (~/.gsd)"
+  echo "  -l, --local               Target local install (./.gsd)"
+  echo "  -c, --config-dir <path>   Target specific .gsd directory"
+  echoPlatformOption()
+  echo "  --all                     Uninstall all detected installations"
+  echoDryRunOption()
+  echoVerboseOption()
+  quit(0)
+
+proc showUpdateCommandHelp() =
+  echo "Usage: gsd update [options]"
+  echo ""
+  echo "Re-installs GSD for all installed platforms (or specified platform)."
+  echo ""
+  echo "Options:"
+  echoPlatformOption()
+  echoDryRunOption()
+  echoVerboseOption()
+  quit(0)
+
 proc findSourceDir(): string =
   ## Find the source directory containing gsd/, commands/, agents/
   ## This is where the installer binary is run from
@@ -181,17 +227,7 @@ proc cmdInstall(args: seq[string]) =
       of "dry-run":
         baseOpts.dryRun = true
       of "h", "help":
-        echo "Usage: gsd install [options]"
-        echo ""
-        echo "Options:"
-        echo "  -g, --global              Install to ~/.<platform> (default)"
-        echo "  -l, --local               Install to ./.<platform>"
-        echo "  -c, --config-dir <path>   Custom config directory"
-        echo "  -p, --platform <name>     Target: claude, codex, or both"
-        echo "  --dry-run                 Preview changes without writing files"
-        echo "  --force-statusline        Replace existing statusline (Claude only)"
-        echo "  --verbose                 Verbose output"
-        quit(0)
+        showInstallCommandHelp()
       else:
         stderr.writeLine "Unknown option: ", p.key
         quit(1)
@@ -299,17 +335,7 @@ proc cmdUninstall(args: seq[string]) =
       of "dry-run":
         dryRun = true
       of "h", "help":
-        echo "Usage: gsd uninstall [options]"
-        echo ""
-        echo "Options:"
-        echo "  -g, --global              Target global install (~/.gsd)"
-        echo "  -l, --local               Target local install (./.gsd)"
-        echo "  -c, --config-dir <path>   Target specific .gsd directory"
-        echo "  -p, --platform <name>     Target: claude, codex, or both"
-        echo "  --all                     Uninstall all detected installations"
-        echo "  --dry-run                 Preview changes without writing files"
-        echo "  --verbose                 Verbose output"
-        quit(0)
+        showUninstallCommandHelp()
       else:
         discard
     of cmdArgument:
@@ -870,15 +896,7 @@ proc cmdUpdate(args: seq[string]) =
       of "dry-run":
         dryRun = true
       of "h", "help":
-        echo "Usage: gsd update [options]"
-        echo ""
-        echo "Re-installs GSD for all installed platforms (or specified platform)."
-        echo ""
-        echo "Options:"
-        echo "  -p, --platform <name>     Target: claude, codex, or both"
-        echo "  --dry-run                 Preview changes without writing files"
-        echo "  --verbose                 Verbose output"
-        quit(0)
+        showUpdateCommandHelp()
       else:
         discard
     of cmdArgument:

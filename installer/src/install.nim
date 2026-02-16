@@ -38,6 +38,14 @@ proc log(msg: string, verbose: bool) =
   if verbose:
     echo "  ", msg
 
+proc installTypeForRewrite(opts: InstallOptions): string =
+  ## Install type string used by path rewriter in bundled prompt files.
+  if opts.configDir.len > 0:
+    return "custom"
+  if opts.installType == itLocal:
+    return "local"
+  return "global"
+
 proc capturePreInstallState(gsdDir, toolDir: string): PreInstallState =
   ## Record what exists before install begins, for rollback
   result.gsdDir = gsdDir
@@ -698,12 +706,7 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
   result.configDir = gsdDir
 
   # Determine install type for path rewriting
-  let installTypeStr = if opts.configDir.len > 0:
-    "custom"
-  elif opts.installType == itLocal:
-    "local"
-  else:
-    "global"
+  let installTypeStr = installTypeForRewrite(opts)
 
   if opts.dryRun:
     echo "[dry-run] Would install GSD to ", gsdDir, " + ", toolDir, " (Codex CLI)..."
@@ -864,12 +867,7 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
   result.configDir = gsdDir
 
   # Determine install type for path rewriting
-  let installTypeStr = if opts.configDir.len > 0:
-    "custom"
-  elif opts.installType == itLocal:
-    "local"
-  else:
-    "global"
+  let installTypeStr = installTypeForRewrite(opts)
 
   if opts.dryRun:
     echo "[dry-run] Would install GSD to ", gsdDir, " + ", toolDir, "..."
