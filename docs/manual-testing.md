@@ -26,9 +26,11 @@ rm -rf ~/.gsd ~/.claude ~/.codex
 2. **Expected:** Interactive menu appears:
    ```
    Select platform to install GSD:
-     1) Claude Code (~/.claude/)
-     2) Codex CLI (~/.codex/)
+     1) Claude Code
+     2) Codex CLI
      3) Both
+
+   Shared resources install to ~/.gsd/
 
    Enter choice [1-3]:
    ```
@@ -37,13 +39,13 @@ rm -rf ~/.gsd ~/.claude ~/.codex
 
 4. **Expected output:**
    ```
-   Installing GSD to /Users/<you>/.claude...
-     Installed gsd resources
+   Installing GSD to /Users/<you>/.gsd + /Users/<you>/.claude...
+     Installed shared resources to /Users/<you>/.gsd
      Installed commands/gsd
      Installed agents
 
-   Installing GSD to /Users/<you>/.codex (Codex CLI)...
-     Installed gsd resources
+   Installing GSD to /Users/<you>/.gsd + /Users/<you>/.codex (Codex CLI)...
+     Installed shared resources to /Users/<you>/.gsd
      Installed prompts
      Generated AGENTS.md
 
@@ -239,13 +241,13 @@ rm -rf ~/.gsd ~/.claude ~/.codex
 
 2. **Expected:** Re-installs both platforms:
    ```
-   Installing GSD to /Users/<you>/.claude...
-     Installed gsd resources
+   Installing GSD to /Users/<you>/.gsd + /Users/<you>/.claude...
+     Installed shared resources to /Users/<you>/.gsd
      Installed commands/gsd
      Installed agents
 
-   Installing GSD to /Users/<you>/.codex (Codex CLI)...
-     Installed gsd resources
+   Installing GSD to /Users/<you>/.gsd + /Users/<you>/.codex (Codex CLI)...
+     Installed shared resources to /Users/<you>/.gsd
      Installed prompts
      Generated AGENTS.md
 
@@ -325,7 +327,7 @@ rm -rf ~/.gsd ~/.claude ~/.codex
 
 4. **Expected:**
    ```
-   Uninstalling GSD from /Users/<you>/.gsd...
+   Uninstalling GSD from /Users/<you>/.claude...
    GSD uninstalled.
    ```
 
@@ -352,10 +354,10 @@ rm -rf ~/.gsd ~/.claude ~/.codex
 
 2. **Expected:** Both uninstall without prompting:
    ```
-   Uninstalling GSD from /Users/<you>/.gsd...
+   Uninstalling GSD from /Users/<you>/.claude...
    GSD uninstalled.
-   Uninstalling GSD from /Users/<you>/.gsd (Codex CLI)...
-   GSD uninstalled.
+   Uninstalling GSD from /Users/<you>/.codex (Codex CLI)...
+   GSD (Codex CLI) uninstalled.
    ```
 
 **Note:** If local installs exist, they are removed too.
@@ -535,7 +537,7 @@ rm -rf ~/.gsd ~/.claude ~/.codex
    ./gsd --version
    ```
 
-2. **Expected:** Version string like `gsd 0.3.0`
+2. **Expected:** Version string like `gsd 0.3.1`
 
 ---
 

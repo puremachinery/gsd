@@ -319,3 +319,40 @@ suite "CLI integration":
     check output.contains("Uninstalling GSD")
     # .gsd/ should be removed (single platform)
     check not dirExists(customGsd)
+
+  test "uninstall --config-dir refuses missing directory and preserves global install":
+    let bin = buildGsdBinary()
+    let workDir = prepareWorkspace()
+    let tempHome = getTempDir() / ("gsd_cli_missing_cfg_" & $epochTime().int)
+    createDir(tempHome)
+
+    let globalGsd = tempHome / ".gsd"
+    seedMinimalInstall(globalGsd, @[pClaudeCode], itGlobal)
+
+    # Simulate global tool files that would be removed if command were unsafe
+    let globalClaude = tempHome / ".claude"
+    createDir(globalClaude / "commands" / "gsd")
+    writeFile(globalClaude / "commands" / "gsd" / "help.md", "# Help")
+
+    let oldHome = getEnv("HOME")
+    let oldEnv = getEnv(ConfigEnvVar)
+    putEnv("HOME", tempHome)
+    clearEnvVar(ConfigEnvVar)
+    defer:
+      if oldHome.len > 0: putEnv("HOME", oldHome) else: delEnv("HOME")
+      if oldEnv.len > 0: putEnv(ConfigEnvVar, oldEnv) else: delEnv(ConfigEnvVar)
+      removeDir(workDir)
+      removeDir(tempHome)
+
+    let badDir = tempHome / "does-not-exist"
+    let output = execProcess(
+      bin,
+      args = @["uninstall", "--config-dir", badDir, "--platform=claude"],
+      options = {poUsePath, poStdErrToStdOut},
+      workingDir = workDir
+    )
+
+    check output.contains("Error: Config directory not found")
+    # Existing global install should remain untouched
+    check fileExists(globalGsd / ConfigFileName)
+    check fileExists(globalClaude / "commands" / "gsd" / "help.md")
