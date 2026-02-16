@@ -16,6 +16,9 @@ Thanks for your interest in contributing. Here's how to get started.
    ```bash
    git config core.hooksPath .githooks
    ```
+   This enables:
+   - `pre-commit`: fast `nimpretty` format check for staged installer `.nim` files
+   - `pre-push`: full `nimble check` (format check + build + tests)
 
 ## Development Workflow
 

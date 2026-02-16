@@ -1201,8 +1201,8 @@ proc isLegacyLocalInstall(legacy: InstalledConfig): bool =
 
   return resolvedPath(legacy.dir) == resolvedPath(platform.getLocalConfigDir(legacy.platform))
 
-proc migrateLegacyGroup(legacyConfigs: seq[InstalledConfig], gsdDir: string, installType: InstallType,
-    verbose: bool): bool =
+proc migrateLegacyGroup(legacyConfigs: seq[InstalledConfig], gsdDir: string,
+    installType: InstallType, verbose: bool): bool =
   ## Migrate one install scope (local or global) from v0.2 to v0.3.
   if legacyConfigs.len == 0:
     return true

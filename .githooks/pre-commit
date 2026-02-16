@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Pre-commit hook: format-check staged Nim files for installer
+# Install with: git config core.hooksPath .githooks
+
+set -euo pipefail
+
+echo "Running pre-commit format checks..."
+
+staged_files=()
+while IFS= read -r file; do
+  if [[ "$file" =~ ^installer/(src|tests)/.+\.nim$ ]]; then
+    staged_files+=("$file")
+  fi
+done < <(git diff --cached --name-only --diff-filter=ACMR)
+
+if [ "${#staged_files[@]}" -eq 0 ]; then
+  exit 0
+fi
+
+failed=0
+for f in "${staged_files[@]}"; do
+  cp "$f" "$f.bak"
+  nimpretty --maxLineLen:100 "$f"
+  if ! diff -q "$f" "$f.bak" > /dev/null 2>&1; then
+    echo "Error: $f is not formatted. Run: nimpretty --maxLineLen:100 $f"
+    diff "$f.bak" "$f" || true
+    failed=1
+  fi
+  mv "$f.bak" "$f"
+done
+
+if [ "$failed" -eq 1 ]; then
+  echo "Format check failed. Run 'nimble format' in installer/ and recommit."
+  exit 1
+fi
+
+echo "Pre-commit format check passed."
