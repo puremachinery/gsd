@@ -8,6 +8,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.3.2] - 2026-02-16
+
+### Added
+- `--dry-run` mode for `install`, `uninstall`, and `update` to preview changes without writing files
+- Windows PowerShell quickstart instructions in `README.md`
+- Release bundle smoke tests for Linux/macOS (`tar.gz`) and Windows (`zip`)
+
+### Changed
+- Pinned GitHub Actions in CI/release workflows to commit SHAs
+
+### Fixed
+- `uninstall --config-dir <bad-path> --platform=<x>` now fails safely without affecting global installs
+- Codex install/uninstall now preserves user-managed content in `~/.codex/AGENTS.md`
+- Claude uninstall now preserves non-GSD hooks bundled in the same hook entry
+- Legacy migration now keeps mixed local and global v0.2 installs separate
+- Windows release zip now extracts with a stable top-level bundle directory
+
+---
+
 ## [0.3.1] - 2026-01-28
 
 ### Added
@@ -68,7 +87,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-[Unreleased]: https://github.com/puremachinery/gsd/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/puremachinery/gsd/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/puremachinery/gsd/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/puremachinery/gsd/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/puremachinery/gsd/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/puremachinery/gsd/commits/v0.2.0

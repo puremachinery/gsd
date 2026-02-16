@@ -1,5 +1,5 @@
 # Package
-version       = "0.3.1"
+version       = "0.3.2"
 author        = "Zera Alexander"
 description   = "GSD installer and hooks for Claude Code and Codex CLI"
 license       = "MIT"
