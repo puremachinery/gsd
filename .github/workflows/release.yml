@@ -104,9 +104,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path $work | Out-Null
           Expand-Archive -Path "$bundle.zip" -DestinationPath $work
           $bundleRoot = Join-Path $work $bundle
-          $home = Join-Path $work "home"
-          New-Item -ItemType Directory -Force -Path $home | Out-Null
-          $env:USERPROFILE = $home
+          $homeDir = Join-Path $work "home"
+          New-Item -ItemType Directory -Force -Path $homeDir | Out-Null
+          $env:USERPROFILE = $homeDir
           & (Join-Path $bundleRoot "gsd.exe") --version
           & (Join-Path $bundleRoot "gsd.exe") install --platform=claude --global --dry-run
           & (Join-Path $bundleRoot "gsd.exe") install --platform=codex --global --dry-run
