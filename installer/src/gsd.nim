@@ -293,22 +293,34 @@ proc cmdUninstall(args: seq[string]) =
   # Normalize explicit config dir if provided
   if configDir.len > 0:
     configDir = expandPath(configDir)
-    let cfg = loadConfig(configDir)
+    if not dirExists(configDir):
+      stderr.writeLine "Error: Config directory not found: ", configDir
+      quit(1)
 
+    let cfg = loadConfig(configDir)
+    if cfg.isNone:
+      stderr.writeLine "Error: Unable to read ", ConfigFileName, " from ", configDir, "."
+      stderr.writeLine "Refusing to uninstall with --config-dir without a valid config file."
+      quit(1)
+
+    var allSuccess = true
     if platformExplicit:
       # Uninstall specific platform(s) from this config dir
       let platforms = platformChoiceToSeq(platformChoice)
       for targetPlatform in platforms:
-        if cfg.isSome and targetPlatform notin cfg.get().platforms:
-          stderr.writeLine "Warning: ", $targetPlatform, " not found in gsd-config.json platforms."
-        discard uninstall(configDir, verbose, targetPlatform)
-    elif cfg.isSome:
+        if targetPlatform notin cfg.get().platforms:
+          stderr.writeLine "Error: ", $targetPlatform, " not found in ", ConfigFileName, "."
+          allSuccess = false
+          continue
+        if not uninstall(configDir, verbose, targetPlatform):
+          allSuccess = false
+    else:
       # Uninstall all platforms listed in config
       for p in cfg.get().platforms:
-        discard uninstall(configDir, verbose, p)
-    else:
-      stderr.writeLine "Error: Unable to determine platforms for ", configDir, "."
-      stderr.writeLine "Provide --platform or restore gsd-config.json."
+        if not uninstall(configDir, verbose, p):
+          allSuccess = false
+
+    if not allSuccess:
       quit(1)
     return
 

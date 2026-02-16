@@ -310,14 +310,15 @@ This agent does task 2.
     check fileExists(destPath)
 
     let content = readFile(destPath)
-    check content.contains("# GSD Agents")
-    check content.contains("auto-generated")
+    check content.contains("<!-- GSD:AGENTS START -->")
+    check content.contains("This section is auto-generated")
     check content.contains("## gsd-agent1")
     check content.contains("## gsd-agent2")
     check content.contains("This agent does task 1")
     check content.contains("This agent does task 2")
     # Global install - paths stay as @~/.gsd/
     check content.contains("@~/.gsd/ref.md")
+    check content.contains("<!-- GSD:AGENTS END -->")
 
   test "sorts agent files for consistent order":
     let tempDir = getTempDir() / "gsd_test_agents_sort"
@@ -353,7 +354,44 @@ This agent does task 2.
     check fileExists(destPath)
 
     let content = readFile(destPath)
-    check content.contains("# GSD Agents")
+    check content.contains("<!-- GSD:AGENTS START -->")
+    check content.contains("<!-- GSD:AGENTS END -->")
+
+  test "preserves user content outside managed section":
+    let tempDir = getTempDir() / "gsd_test_agents_preserve"
+    createDir(tempDir)
+    defer: removeDir(tempDir)
+
+    let agentPath = tempDir / "gsd-alpha.md"
+    writeFile(agentPath, "# Alpha agent")
+
+    let destPath = tempDir / "AGENTS.md"
+    writeFile(destPath, "# My Custom Agents\n\nKeep this section.\n")
+
+    let success = generateAgentsMd(@[agentPath], destPath, "global", "")
+
+    check success == true
+    let content = readFile(destPath)
+    check content.contains("# My Custom Agents")
+    check content.contains("Keep this section.")
+    check content.contains("## gsd-alpha")
+
+  test "stripCodexAgentsSection removes only managed section":
+    let content = """
+# User Header
+
+Custom content.
+
+<!-- GSD:AGENTS START -->
+# GSD Agents
+
+Managed content.
+<!-- GSD:AGENTS END -->
+"""
+    let stripped = stripCodexAgentsSection(content)
+    check stripped.contains("# User Header")
+    check stripped.contains("Custom content.")
+    check not stripped.contains("Managed content.")
 
 suite "Codex install integration":
   test "full Codex install creates expected structure":
@@ -473,12 +511,19 @@ suite "Codex install integration":
     createDir(gsdDir / "templates")
     createDir(gsdDir / "cache")
     writeFile(gsdDir / "VERSION", "0.2.0")
-    writeFile(gsdDir / ConfigFileName, """{"platforms":["codex"],"gsd_dir":"""" & gsdDir & """","version":"0.2.0"}""")
+    let cfg = GsdConfig(
+      version: "0.2.0",
+      installType: itLocal,
+      platforms: @[pCodexCli],
+      gsdDir: gsdDir,
+      installedAt: "2026-01-01T00:00:00Z"
+    )
+    discard saveConfig(cfg, gsdDir)
 
     # Set up .codex/ (tool-specific)
     createDir(toolDir)
     createDir(toolDir / "prompts")
-    writeFile(toolDir / "AGENTS.md", "# GSD Agents")
+    writeFile(toolDir / "AGENTS.md", renderCodexAgentsSection(@[], "global", ""))
     writeFile(toolDir / "prompts" / "gsd-help.md", "# GSD Help")
     writeFile(toolDir / "prompts" / "gsd-new-project.md", "# GSD New Project")
 
@@ -518,6 +563,53 @@ command = "my-custom-hook"
 
     # .gsd/ should be removed (only platform was codex, now empty)
     check not dirExists(gsdDir)
+
+  test "Codex uninstall preserves user AGENTS.md content":
+    let originalDir = getCurrentDir()
+    let tempWork = getTempDir() / "gsd_test_codex_agents_preserve"
+    let tempHome = getTempDir() / "gsd_test_codex_agents_preserve_home"
+    createDir(tempWork)
+    createDir(tempHome)
+
+    let oldHome = getEnv("HOME")
+    putEnv("HOME", tempHome)
+    setCurrentDir(tempWork)
+    let resolvedWork = getCurrentDir()
+    defer:
+      setCurrentDir(originalDir)
+      if oldHome.len > 0: putEnv("HOME", oldHome) else: delEnv("HOME")
+      removeDir(tempWork)
+      removeDir(tempHome)
+
+    let gsdDir = resolvedWork / ".gsd"
+    let toolDir = resolvedWork / ".codex"
+
+    # Set up .gsd/ (shared)
+    createDir(gsdDir)
+    writeFile(gsdDir / "VERSION", Version)
+    let cfg = %*{
+      "platforms": ["codex"],
+      "install_type": "local",
+      "gsd_dir": gsdDir,
+      "version": Version
+    }
+    writeFile(gsdDir / ConfigFileName, cfg.pretty())
+
+    # Set up .codex/ (tool-specific)
+    createDir(toolDir)
+    createDir(toolDir / "prompts")
+    writeFile(toolDir / "prompts" / "gsd-help.md", "# GSD Help")
+    writeFile(toolDir / "AGENTS.md", "# My Team Agents\n\nKeep this.\n\n" &
+        renderCodexAgentsSection(@[], "global", ""))
+
+    let success = uninstall(gsdDir, false, pCodexCli)
+    check success == true
+
+    check fileExists(toolDir / "AGENTS.md")
+    let agentsContent = readFile(toolDir / "AGENTS.md")
+    check agentsContent.contains("# My Team Agents")
+    check agentsContent.contains("Keep this.")
+    check not agentsContent.contains("<!-- GSD:AGENTS START -->")
 
   test "Codex install then uninstall is clean":
     let originalDir = getCurrentDir()
@@ -729,6 +821,132 @@ suite "Claude Code install integration":
 
     # Clean up
     removeDir(toolDir / "settings.json")
+
+suite "uninstall safety":
+  test "Claude uninstall preserves custom hook in mixed entry":
+    let originalDir = getCurrentDir()
+    let tempWork = getTempDir() / "gsd_test_uninstall_hook_preserve"
+    let tempHome = getTempDir() / "gsd_test_uninstall_hook_preserve_home"
+    createDir(tempWork)
+    createDir(tempHome)
+
+    let oldHome = getEnv("HOME")
+    putEnv("HOME", tempHome)
+    setCurrentDir(tempWork)
+    let resolvedWork = getCurrentDir()
+    defer:
+      setCurrentDir(originalDir)
+      if oldHome.len > 0: putEnv("HOME", oldHome) else: delEnv("HOME")
+      removeDir(tempWork)
+      removeDir(tempHome)
+
+    let gsdDir = resolvedWork / ".gsd"
+    let toolDir = resolvedWork / ".claude"
+    createDir(gsdDir)
+    createDir(toolDir)
+
+    let cfg = GsdConfig(
+      version: Version,
+      installType: itLocal,
+      platforms: @[pClaudeCode],
+      gsdDir: gsdDir,
+      installedAt: "2026-01-01T00:00:00Z"
+    )
+    discard saveConfig(cfg, gsdDir)
+
+    let settings = %*{
+      "hooks": {
+        "SessionStart": [
+          {
+            "matcher": "",
+            "hooks": [
+              {"type": "command", "command": "gsd check-update #gsd"},
+              {"type": "command", "command": "echo keep-me"}
+            ]
+          }
+        ]
+      }
+    }
+    writeFile(toolDir / "settings.json", settings.pretty())
+
+    check uninstall(gsdDir, false, pClaudeCode) == true
+    check fileExists(toolDir / "settings.json")
+
+    let newSettings = parseJson(readFile(toolDir / "settings.json"))
+    check newSettings.hasKey("hooks")
+    check newSettings["hooks"].hasKey("SessionStart")
+    check newSettings["hooks"]["SessionStart"].len == 1
+    check newSettings["hooks"]["SessionStart"][0]["hooks"].len == 1
+    check newSettings["hooks"]["SessionStart"][0]["hooks"][0]["command"].getStr() == "echo keep-me"
+
+suite "legacy migration":
+  test "migrates mixed local and global legacy installs separately":
+    let originalDir = getCurrentDir()
+    let tempWork = getTempDir() / "gsd_test_legacy_mixed_work"
+    let tempHome = getTempDir() / "gsd_test_legacy_mixed_home"
+    createDir(tempWork)
+    createDir(tempHome)
+
+    let oldHome = getEnv("HOME")
+    putEnv("HOME", tempHome)
+    setCurrentDir(tempWork)
+    let resolvedWork = getCurrentDir()
+    defer:
+      setCurrentDir(originalDir)
+      if oldHome.len > 0: putEnv("HOME", oldHome) else: delEnv("HOME")
+      removeDir(tempWork)
+      removeDir(tempHome)
+
+    let localLegacyDir = resolvedWork / ".claude"
+    let globalLegacyDir = tempHome / ".claude"
+    createDir(localLegacyDir)
+    createDir(globalLegacyDir)
+    createDir(localLegacyDir / "gsd")
+    createDir(globalLegacyDir / "gsd")
+
+    let localLegacyCfg = %*{
+      "version": "0.2.0",
+      "platform": "claude",
+      "install_type": "local",
+      "config_dir": localLegacyDir,
+      "installed_at": "2026-01-01T00:00:00Z"
+    }
+    let globalLegacyCfg = %*{
+      "version": "0.2.0",
+      "platform": "claude",
+      "install_type": "global",
+      "config_dir": globalLegacyDir,
+      "installed_at": "2026-01-01T00:00:00Z"
+    }
+    writeFile(localLegacyDir / ConfigFileName, localLegacyCfg.pretty())
+    writeFile(globalLegacyDir / ConfigFileName, globalLegacyCfg.pretty())
+    writeFile(localLegacyDir / "gsd" / "local.txt", "local")
+    writeFile(globalLegacyDir / "gsd" / "global.txt", "global")
+
+    let legacyConfigs = @[
+      InstalledConfig(platform: pClaudeCode, dir: localLegacyDir),
+      InstalledConfig(platform: pClaudeCode, dir: globalLegacyDir)
+    ]
+
+    check migrateLegacyInstall(legacyConfigs, false) == true
+
+    let localGsdDir = resolvedWork / ".gsd"
+    let globalGsdDir = tempHome / ".gsd"
+    check fileExists(localGsdDir / ConfigFileName)
+    check fileExists(globalGsdDir / ConfigFileName)
+    check fileExists(localGsdDir / "local.txt")
+    check fileExists(globalGsdDir / "global.txt")
+
+    let localCfg = loadConfig(localGsdDir)
+    let globalCfg = loadConfig(globalGsdDir)
+    check localCfg.isSome
+    check globalCfg.isSome
+    check localCfg.get().installType == itLocal
+    check globalCfg.get().installType == itGlobal
+
+    # Legacy markers should be removed from tool dirs
+    check not fileExists(localLegacyDir / ConfigFileName)
+    check not fileExists(globalLegacyDir / ConfigFileName)
 
   test "update install preserves existing dirs on failure":
     let originalDir = getCurrentDir()
