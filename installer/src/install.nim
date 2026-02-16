@@ -20,6 +20,7 @@ type
     platform*: Platform
     forceStatusline*: bool
     verbose*: bool
+    dryRun*: bool
 
   InstallResult* = object
     success*: bool
@@ -36,6 +37,14 @@ type
 proc log(msg: string, verbose: bool) =
   if verbose:
     echo "  ", msg
+
+proc installTypeForRewrite(opts: InstallOptions): string =
+  ## Install type string used by path rewriter in bundled prompt files.
+  if opts.configDir.len > 0:
+    return "custom"
+  if opts.installType == itLocal:
+    return "local"
+  return "global"
 
 proc capturePreInstallState(gsdDir, toolDir: string): PreInstallState =
   ## Record what exists before install begins, for rollback
@@ -696,6 +705,21 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
 
   result.configDir = gsdDir
 
+  # Determine install type for path rewriting
+  let installTypeStr = installTypeForRewrite(opts)
+
+  if opts.dryRun:
+    echo "[dry-run] Would install GSD to ", gsdDir, " + ", toolDir, " (Codex CLI)..."
+    echo "  Would install shared resources to ", gsdDir
+    echo "  Would write VERSION and ensure cache/ in ", gsdDir
+    echo "  Would install prompts to ", toolDir / CodexPromptsDir
+    echo "  Would merge managed GSD section into ", toolDir / CodexAgentsMdFile
+    echo "  Would merge GSD notify hooks into ", toolDir / CodexConfigFile
+    echo "  Would update ", gsdDir / ConfigFileName, " for platform codex"
+    result.success = true
+    result.message = "Dry run complete"
+    return
+
   # Capture pre-install state for rollback
   let state = capturePreInstallState(gsdDir, toolDir)
 
@@ -711,14 +735,6 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
         return
 
   echo "Installing GSD to ", gsdDir, " + ", toolDir, " (Codex CLI)..."
-
-  # Determine install type for path rewriting
-  let installTypeStr = if opts.configDir.len > 0:
-    "custom"
-  elif opts.installType == itLocal:
-    "local"
-  else:
-    "global"
 
   # Phase A: Shared resources to .gsd/
   let gsdSource = sourceDir / "gsd"
@@ -850,6 +866,21 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
 
   result.configDir = gsdDir
 
+  # Determine install type for path rewriting
+  let installTypeStr = installTypeForRewrite(opts)
+
+  if opts.dryRun:
+    echo "[dry-run] Would install GSD to ", gsdDir, " + ", toolDir, "..."
+    echo "  Would install shared resources to ", gsdDir
+    echo "  Would write VERSION and ensure cache/ in ", gsdDir
+    echo "  Would install commands to ", toolDir / "commands" / "gsd"
+    echo "  Would install managed GSD agent files into ", toolDir / "agents"
+    echo "  Would merge hooks and statusLine into ", toolDir / "settings.json"
+    echo "  Would update ", gsdDir / ConfigFileName, " for platform ", $opts.platform
+    result.success = true
+    result.message = "Dry run complete"
+    return
+
   # Capture pre-install state for rollback
   var state = capturePreInstallState(gsdDir, toolDir)
 
@@ -865,14 +896,6 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
         return
 
   echo "Installing GSD to ", gsdDir, " + ", toolDir, "..."
-
-  # Determine install type for path rewriting
-  let installTypeStr = if opts.configDir.len > 0:
-    "custom"
-  elif opts.installType == itLocal:
-    "local"
-  else:
-    "global"
 
   # Phase A: Shared resources to .gsd/
 
@@ -1044,7 +1067,7 @@ proc removeCodexGsdPrompts(promptsDir: string, verbose: bool) =
         except OSError:
           discard
 
-proc uninstallCodex*(gsdDir: string, verbose: bool): bool =
+proc uninstallCodex*(gsdDir: string, verbose: bool, dryRun: bool = false): bool =
   ## Remove GSD Codex CLI files from tool dir, update .gsd/ config
   ## gsdDir is the .gsd/ directory; tool dir is derived from platform
 
@@ -1054,10 +1077,23 @@ proc uninstallCodex*(gsdDir: string, verbose: bool): bool =
     return false
   let toolDir = toolDirOpt.get()
 
-  echo "Uninstalling GSD from ", toolDir, " (Codex CLI)..."
-
   # Remove GSD prompt files (gsd-*.md)
   let promptsDir = toolDir / CodexPromptsDir
+
+  # Update config.toml to remove GSD hooks
+  let configTomlPath = toolDir / CodexConfigFile
+
+  if dryRun:
+    echo "[dry-run] Would uninstall GSD from ", toolDir, " (Codex CLI)..."
+    echo "  Would remove GSD prompts from ", promptsDir
+    echo "  Would remove/adjust managed GSD section in ", toolDir / CodexAgentsMdFile
+    echo "  Would remove GSD hooks from ", configTomlPath
+    echo "  Would update ", gsdDir / ConfigFileName, " and remove ", gsdDir,
+        " if no platforms remain"
+    return true
+
+  echo "Uninstalling GSD from ", toolDir, " (Codex CLI)..."
+
   removeCodexGsdPrompts(promptsDir, verbose)
 
   # Remove managed GSD section from AGENTS.md, preserving user content
@@ -1078,7 +1114,6 @@ proc uninstallCodex*(gsdDir: string, verbose: bool): bool =
       stderr.writeLine "Warning: Could not update AGENTS.md"
 
   # Update config.toml to remove GSD hooks
-  let configTomlPath = toolDir / CodexConfigFile
   if fileExists(configTomlPath):
     try:
       let existingContent = readFile(configTomlPath)
@@ -1106,12 +1141,13 @@ proc uninstallCodex*(gsdDir: string, verbose: bool): bool =
   echo "GSD (Codex CLI) uninstalled."
   return true
 
-proc uninstall*(gsdDir: string, verbose: bool, p: Platform = pClaudeCode): bool =
+proc uninstall*(gsdDir: string, verbose: bool, p: Platform = pClaudeCode,
+    dryRun: bool = false): bool =
   ## Remove GSD from tool directory and update .gsd/ config
   ## gsdDir is the .gsd/ directory; tool dir is derived from platform
 
   if p == pCodexCli:
-    return uninstallCodex(gsdDir, verbose)
+    return uninstallCodex(gsdDir, verbose, dryRun)
 
   # Derive tool dir from install metadata
   let toolDirOpt = resolveToolDir(gsdDir, p)
@@ -1119,10 +1155,20 @@ proc uninstall*(gsdDir: string, verbose: bool, p: Platform = pClaudeCode): bool 
     return false
   let toolDir = toolDirOpt.get()
 
-  echo "Uninstalling GSD from ", toolDir, "..."
-
   # Remove commands/gsd/ from tool dir
   let commandsDir = toolDir / "commands" / "gsd"
+
+  if dryRun:
+    echo "[dry-run] Would uninstall GSD from ", toolDir, "..."
+    echo "  Would remove ", commandsDir
+    echo "  Would remove managed GSD agent files from ", toolDir / "agents"
+    echo "  Would remove GSD hooks/statusLine from ", toolDir / "settings.json"
+    echo "  Would update ", gsdDir / ConfigFileName, " and remove ", gsdDir,
+        " if no platforms remain"
+    return true
+
+  echo "Uninstalling GSD from ", toolDir, "..."
+
   if dirExists(commandsDir):
     try:
       removeDir(commandsDir)
