@@ -1,6 +1,6 @@
 # Smoke Testing
 
-## Current Automated Smoke
+## Contract Smoke
 
 GSD now has a deterministic bootstrap smoke contract that runs in local developer checks and PR CI on Linux and macOS.
 
@@ -24,24 +24,68 @@ The smoke script lives at `scripts/smoke/bootstrap-contract.sh` and does this in
 2. Installs GSD locally for both Claude Code and Codex CLI.
 3. Verifies the managed runtime exists at `.gsd/runtime/bin/gsd`.
 4. Verifies Claude and Codex command/prompt files were installed.
-5. Verifies local installs rewrite `@~/.gsd/...` references to `@.gsd/...`.
-6. Verifies installed hook/statusline commands point at the managed runtime binary.
-7. Verifies `.gsd/gsd-config.json` records the expected local install metadata.
-8. Exercises the deterministic setup contract from `gsd:new-project` by:
+5. Verifies the prompt-referenced bundled files actually exist:
+   - `.gsd/references/questioning.md`
+   - `.gsd/references/ui-brand.md`
+   - `.gsd/templates/project.md`
+   - `.gsd/templates/requirements.md`
+6. Verifies local installs rewrite `@~/.gsd/...` references to `@.gsd/...`.
+7. Verifies installed hook/statusline commands point at the managed runtime binary.
+8. Verifies `.gsd/gsd-config.json` records the expected local install metadata.
+9. Exercises the deterministic setup contract from `gsd:new-project` by:
    - initializing git in the temp project
    - checking that brownfield detection reports an empty project
-9. Runs the managed binary for:
+10. Runs the managed binary for:
    - `doctor --platform=claude`
    - `doctor --platform=codex`
    - `update --platform=both --dry-run`
    - `statusline --config-dir ...`
-10. Verifies the statusline renders project/task/context information from the temp project.
+11. Verifies the statusline renders project/task/context information from the temp project.
 
 This is intentionally a contract smoke, not a model-behavior test. It proves that a fresh install produces the artifacts and deterministic runtime behavior that an assistant needs before `/gsd:new-project` can succeed.
 
-## Why PR CI Stops Here
+## Live Smoke
 
-A true end-to-end `/gsd:new-project` smoke depends on an external assistant runtime that can:
+GSD also has a real model-driven smoke for `gsd:new-project` using headless Codex execution.
+
+Run it locally after authenticating Codex:
+
+```bash
+cd installer
+nimble build -y
+cd ..
+./scripts/smoke/live-new-project.sh installer/gsd
+```
+
+Or run the manual GitHub Actions workflow:
+
+- workflow: `Live Smoke`
+- trigger: `workflow_dispatch`
+- secret required: `OPENAI_API_KEY`
+
+The live smoke script at `scripts/smoke/live-new-project.sh` does this:
+
+1. Creates a fresh temp project.
+2. Installs GSD locally for Codex.
+3. Runs headless `codex exec` against the installed `.codex/prompts/gsd-new-project.md`.
+4. Supplies a fixed project brief for a tiny `todo-smoke` Python CLI.
+5. Forces the run to stop once the initialization workflow is complete.
+6. Verifies the real workflow outputs exist:
+   - `.planning/PROJECT.md`
+   - `.planning/config.json`
+   - `.planning/REQUIREMENTS.md`
+   - `.planning/ROADMAP.md`
+   - `.planning/STATE.md`
+   - `.git/`
+7. Verifies the planning docs mention the seeded project brief and requirement IDs.
+8. Verifies the workflow made at least one git commit.
+9. Fails if the model drifts into implementation or optional research.
+
+This is the test that actually smokes the `new-project` workflow end to end.
+
+## Why PR CI Still Stops At The Contract Layer
+
+A true end-to-end `/gsd:new-project` smoke still depends on an external assistant runtime that can:
 
 1. run headlessly
 2. authenticate non-interactively
@@ -50,24 +94,6 @@ A true end-to-end `/gsd:new-project` smoke depends on an external assistant runt
 
 That is not a reasonable required check yet. Putting a live LLM in required CI would turn unrelated PRs red because of auth drift, provider outages, or prompt nondeterminism.
 
-## Recommended Next Layer
+## Provider Coverage
 
-The next layer should be a separate manual `workflow_dispatch` workflow, not a required PR check.
-
-Recommended shape:
-
-1. Create a fresh temp repo.
-2. Install GSD from the release bundle being tested.
-3. Start the target assistant in headless mode.
-4. Invoke `/gsd:new-project` with a fixed prompt and fixed answers.
-5. Assert the expected outputs exist:
-   - `.planning/PROJECT.md`
-   - `.planning/config.json`
-   - `.planning/REQUIREMENTS.md`
-   - `.planning/ROADMAP.md`
-   - `.planning/STATE.md`
-   - `.git/`
-6. Assert the generated docs mention the seeded project goal and that requirement/roadmap artifacts are non-empty.
-7. Store the generated project as a workflow artifact for inspection on failure.
-
-That would give us real agent-driven coverage without making routine PRs depend on external model behavior.
+Current live coverage is Codex because it has a reliable headless execution path for automation. Claude can be added later as a second manual smoke once its non-interactive flow is scripted with the same level of determinism.

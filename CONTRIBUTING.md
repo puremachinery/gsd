@@ -26,6 +26,7 @@ Thanks for your interest in contributing. Here's how to get started.
 - Format code: `nimble format` (enforced by CI)
 - Run tests: `nimble test`
 - Run bootstrap smoke: `nimble smoke`
+- Run live `new-project` smoke manually: `./scripts/smoke/live-new-project.sh installer/gsd` (requires Codex auth)
 - Full check before pushing: `nimble verify`
 
 ## Making Changes

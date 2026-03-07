@@ -1,0 +1,53 @@
+name: Live Smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  codex-new-project:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HOME: ${{ runner.temp }}/codex-home
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - uses: jiro4989/setup-nim-action@cb1fc1270b117457dd0d9f610ec981fad3369cec # v2
+        with:
+          nim-version: "stable"
+
+      - name: Install PCRE
+        run: sudo apt-get update && sudo apt-get install -y libpcre3-dev
+
+      - name: Install Codex CLI
+        run: npm install -g @openai/codex
+
+      - name: Authenticate Codex
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          test -n "$OPENAI_API_KEY"
+          mkdir -p "$HOME"
+          printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+          codex login status
+
+      - name: Build installer
+        working-directory: installer
+        run: nimble build -y
+
+      - name: Run live new-project smoke
+        env:
+          GSD_LIVE_SMOKE_ROOT: ${{ runner.temp }}/gsd-live-smoke-codex
+          GSD_LIVE_SMOKE_PRESERVE: '1'
+        run: ./scripts/smoke/live-new-project.sh installer/gsd
+
+      - name: Upload live smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: codex-live-smoke
+          path: ${{ runner.temp }}/gsd-live-smoke-codex

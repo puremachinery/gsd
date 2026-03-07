@@ -133,7 +133,7 @@ nimble format         # format code with nimpretty
 nimble verify         # format check + build + test + smoke (used by pre-push hook)
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/smoke-testing.md](docs/smoke-testing.md) for development and smoke-test details.
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/smoke-testing.md](docs/smoke-testing.md) for development, contract smoke, and live `new-project` smoke details.
 
 ## Attribution
 
