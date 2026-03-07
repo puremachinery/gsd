@@ -352,43 +352,80 @@ proc installManagedRuntime(sourceDir, gsdDir: string, verbose: bool): bool =
   ## Install a managed runtime bundle under .gsd/runtime/ so hooks do not
   ## depend on the transient binary path used during installation.
   let runtimeDir = getManagedRuntimeDir(gsdDir)
-  let runtimeBinDir = runtimeDir / ManagedRuntimeBinDirName
   let managedBinaryPath = getManagedBinaryPath(gsdDir)
   let selfPath = getAppFilename()
+  let tempRuntimeDir = runtimeDir & ".tmp." & $epochTime().int
+  let tempRuntimeBinDir = tempRuntimeDir / ManagedRuntimeBinDirName
+  let tempManagedBinaryPath = tempRuntimeBinDir / ManagedBinaryName
+  let backupRuntimeDir = runtimeDir & ".bak"
+
+  proc cleanupTempRuntime() =
+    if dirExists(tempRuntimeDir):
+      try:
+        removeDir(tempRuntimeDir)
+      except OSError:
+        discard
 
   if selfPath.len == 0 or not fileExists(selfPath):
     stderr.writeLine "Error: Cannot locate the running gsd binary."
     return false
 
+  # Updating from the managed runtime itself is already self-contained.
+  if samePath(sourceDir, runtimeDir) and samePath(selfPath, managedBinaryPath):
+    return true
+
   try:
-    createDir(runtimeDir)
-    createDir(runtimeBinDir)
+    createDir(tempRuntimeDir)
+    createDir(tempRuntimeBinDir)
   except OSError as e:
     stderr.writeLine "Error creating managed runtime directory: ", e.msg
+    cleanupTempRuntime()
     return false
 
-  if not samePath(sourceDir, runtimeDir):
-    for (name, required) in ManagedRuntimeSourceDirs:
-      let src = sourceDir / name
-      if not dirExists(src):
-        if required:
-          stderr.writeLine "Error: Managed runtime source missing ", src
-          return false
-        continue
-      if not copyDirRecursive(src, runtimeDir / name, verbose):
+  for (name, required) in ManagedRuntimeSourceDirs:
+    let src = sourceDir / name
+    if not dirExists(src):
+      if required:
+        stderr.writeLine "Error: Managed runtime source missing ", src
+        cleanupTempRuntime()
         return false
-
-  if not samePath(selfPath, managedBinaryPath):
-    try:
-      copyFile(selfPath, managedBinaryPath)
-      try:
-        setFilePermissions(managedBinaryPath, getFilePermissions(selfPath))
-      except OSError as e:
-        stderr.writeLine "Warning: Could not set permissions on managed runtime binary: ", e.msg
-      log("Installed managed runtime binary", verbose)
-    except OSError as e:
-      stderr.writeLine "Error copying managed runtime binary: ", e.msg
+      continue
+    if not copyDirRecursive(src, tempRuntimeDir / name, verbose):
+      cleanupTempRuntime()
       return false
+
+  try:
+    copyFile(selfPath, tempManagedBinaryPath)
+    try:
+      setFilePermissions(tempManagedBinaryPath, getFilePermissions(selfPath))
+    except OSError as e:
+      stderr.writeLine "Warning: Could not set permissions on managed runtime binary: ", e.msg
+    log("Installed managed runtime binary", verbose)
+  except OSError as e:
+    stderr.writeLine "Error copying managed runtime binary: ", e.msg
+    cleanupTempRuntime()
+    return false
+
+  try:
+    if dirExists(backupRuntimeDir):
+      removeDir(backupRuntimeDir)
+
+    if dirExists(runtimeDir):
+      moveDir(runtimeDir, backupRuntimeDir)
+
+    moveDir(tempRuntimeDir, runtimeDir)
+
+    if dirExists(backupRuntimeDir):
+      removeDir(backupRuntimeDir)
+  except OSError as e:
+    stderr.writeLine "Error installing managed runtime: ", e.msg
+    cleanupTempRuntime()
+    if dirExists(backupRuntimeDir) and not dirExists(runtimeDir):
+      try:
+        moveDir(backupRuntimeDir, runtimeDir)
+      except OSError:
+        discard
+    return false
 
   return true
 

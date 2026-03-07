@@ -978,6 +978,7 @@ suite "legacy migration":
 
     let gsdDir = resolvedWork / ".gsd"
     let toolDir = resolvedWork / ".claude"
+    let runtimeDir = getManagedRuntimeDir(gsdDir)
 
     # Pre-create dirs to simulate an update (both existed before)
     createDir(gsdDir)
@@ -1004,6 +1005,11 @@ suite "legacy migration":
     check dirExists(toolDir)
     check fileExists(gsdDir / "existing-file.txt")
     check fileExists(toolDir / "existing-file.txt")
+    check not dirExists(runtimeDir)
+    check not dirExists(runtimeDir & ".bak")
+
+    for kind, path in walkDir(gsdDir):
+      check not extractFilename(path).startsWith("runtime.tmp.")
 
     # Clean up
     removeDir(toolDir / "settings.json")
