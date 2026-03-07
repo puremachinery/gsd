@@ -11,60 +11,8 @@ fail() {
   exit 1
 }
 
-require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || fail "required command not found: $1"
-}
-
-select_python() {
-  if command -v python3 >/dev/null 2>&1; then
-    printf '%s\n' "python3"
-    return 0
-  fi
-  if command -v python >/dev/null 2>&1; then
-    printf '%s\n' "python"
-    return 0
-  fi
-
-  fail "python3 or python is required"
-}
-
-resolve_path() {
-  local path="$1"
-  local dir base
-
-  dir="$(dirname "$path")"
-  base="$(basename "$path")"
-  (
-    cd "$dir"
-    printf '%s/%s\n' "$(pwd -P)" "$base"
-  )
-}
-
-assert_file() {
-  [ -f "$1" ] || fail "expected file: $1"
-}
-
-assert_dir() {
-  [ -d "$1" ] || fail "expected directory: $1"
-}
-
-assert_executable() {
-  [ -x "$1" ] || fail "expected executable file: $1"
-}
-
-assert_contains() {
-  local haystack="$1"
-  local needle="$2"
-  printf '%s' "$haystack" | grep -F -- "$needle" >/dev/null || fail "expected to find '$needle'"
-}
-
-assert_not_contains() {
-  local haystack="$1"
-  local needle="$2"
-  if printf '%s' "$haystack" | grep -F -- "$needle" >/dev/null; then
-    fail "did not expect to find '$needle'"
-  fi
-}
+script_dir="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+. "$script_dir/lib.sh"
 
 run_in_project() {
   (
@@ -94,6 +42,12 @@ PYTHON_BIN="$(select_python)"
 
 tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/gsd-bootstrap-smoke.XXXXXX")"
 cleanup() {
+  local exit_code=$?
+  if [ "$exit_code" -ne 0 ] || [ -n "${GSD_SMOKE_PRESERVE_TMP:-}" ]; then
+    printf 'Bootstrap smoke artifacts preserved at %s\n' "$tmp_root" >&2
+    return
+  fi
+
   rm -rf "$tmp_root"
 }
 trap cleanup EXIT
@@ -181,13 +135,13 @@ PY
 git_output="$(run_project_bash 'if [ -d .git ] || [ -f .git ]; then
   echo "Git repo exists in current directory"
 else
-  git -c init.defaultBranch=master init >/dev/null 2>&1
+  git -c init.defaultBranch=main init >/dev/null 2>&1
   echo "Initialized new git repo"
 fi')"
 assert_contains "$git_output" "Initialized new git repo"
 assert_dir "$project_dir/.git"
 
-brownfield_output="$(run_project_bash 'CODE_FILES=$(find . -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" \) 2>/dev/null | grep -v deps | grep -v .git | head -20)
+brownfield_output="$(run_project_bash 'CODE_FILES=$(find . -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" \) | grep -v deps | grep -v .git | head -20)
 HAS_PACKAGE=$([ -f project.manifest ] || [ -f requirements.txt ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f Package.swift ] && echo "yes")
 HAS_CODEBASE_MAP=$([ -d .planning/codebase ] && echo "yes")
 printf "CODE_FILES=%s\nHAS_PACKAGE=%s\nHAS_CODEBASE_MAP=%s\n" "$CODE_FILES" "$HAS_PACKAGE" "$HAS_CODEBASE_MAP"')"

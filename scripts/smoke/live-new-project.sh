@@ -11,55 +11,8 @@ fail() {
   exit 1
 }
 
-resolve_path() {
-  local path="$1"
-  local dir base
-
-  dir="$(dirname "$path")"
-  base="$(basename "$path")"
-  (
-    cd "$dir"
-    printf '%s/%s\n' "$(pwd -P)" "$base"
-  )
-}
-
-assert_file() {
-  [ -f "$1" ] || fail "expected file: $1"
-}
-
-assert_dir() {
-  [ -d "$1" ] || fail "expected directory: $1"
-}
-
-assert_contains() {
-  local haystack="$1"
-  local needle="$2"
-  printf '%s' "$haystack" | grep -F -- "$needle" >/dev/null || fail "expected to find '$needle'"
-}
-
-assert_contains_any() {
-  local haystack="$1"
-  shift
-  local needle
-
-  for needle in "$@"; do
-    if printf '%s' "$haystack" | grep -F -- "$needle" >/dev/null; then
-      return 0
-    fi
-  done
-
-  fail "expected to find one of: $*"
-}
-
-assert_matches() {
-  local haystack="$1"
-  local pattern="$2"
-  printf '%s' "$haystack" | grep -E -- "$pattern" >/dev/null || fail "expected to match regex: $pattern"
-}
-
-require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || fail "required command not found: $1"
-}
+script_dir="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+. "$script_dir/lib.sh"
 
 prepare_codex_home() {
   local source_codex_home="${CODEX_HOME:-$HOME/.codex}"
@@ -189,7 +142,7 @@ assert_contains "$config_content" '"mode"'
 commit_count="$(git -C "$project_dir" rev-list --count HEAD)"
 [ "$commit_count" -ge 1 ] || fail "expected at least one git commit"
 
-unexpected_files="$(cd "$project_dir" && find . -type f ! -path './.planning/*' ! -path './.codex/*' ! -path './.gsd/*' ! -path './.git/*' | sort || true)"
+unexpected_files="$(cd "$project_dir" && find . -type f ! -path './.planning/*' ! -path './.codex/*' ! -path './.gsd/*' ! -path './.git/*' | sort)"
 [ -z "$unexpected_files" ] || fail "unexpected non-workflow files created: $unexpected_files"
 
 if [ -d "$project_dir/.planning/research" ]; then

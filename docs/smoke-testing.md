@@ -18,9 +18,9 @@ cd installer
 nimble verify
 ```
 
-The smoke script lives at `scripts/smoke/bootstrap-contract.sh` and does this in a fresh temp `HOME` and temp project directory:
+The smoke script lives at `scripts/smoke/bootstrap-contract.sh`. `nimble smoke` builds `installer/gsd` first, then runs the script against that binary in a fresh temp `HOME` and temp project directory:
 
-1. Builds or uses the current `gsd` binary.
+1. Uses the provided `gsd` binary.
 2. Installs GSD locally for both Claude Code and Codex CLI.
 3. Verifies the managed runtime exists at `.gsd/runtime/bin/gsd`.
 4. Verifies Claude and Codex command/prompt files were installed.
@@ -56,6 +56,8 @@ nimble build -y
 cd ..
 ./scripts/smoke/live-new-project.sh installer/gsd
 ```
+
+For local debugging, preserve artifacts with `GSD_SMOKE_PRESERVE_TMP=1` for the contract smoke or `GSD_LIVE_SMOKE_PRESERVE=1` for the live smoke.
 
 Or run the manual GitHub Actions workflow:
 
