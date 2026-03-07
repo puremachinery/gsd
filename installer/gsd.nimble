@@ -1,3 +1,5 @@
+import os
+
 # Package
 version       = "0.3.3"
 author        = "Zera Alexander"
@@ -22,20 +24,32 @@ task test, "Run tests":
 task format, "Format source with nimpretty":
   for f in listFiles("src") & listFiles("tests"):
     if f.endsWith(".nim"):
-      exec "nimpretty --maxLineLen:100 " & f
+      exec "nimpretty --maxLineLen:100 " & quoteShell(f)
 
-task check, "Run format check, build, and tests":
+task smoke_script, "Run the bootstrap smoke contract script":
+  when defined(windows):
+    echo "Skipping bootstrap smoke on Windows; requires Bash."
+  else:
+    exec "bash ../scripts/smoke/bootstrap-contract.sh gsd"
+
+task smoke, "Run bootstrap smoke contract":
+  exec "nimble build -y"
+  exec "nimble smoke_script -y"
+
+task verify, "Run format check, build, tests, and bootstrap smoke":
   # Format check (diff-based, non-destructive)
   var failed = false
   for f in listFiles("src") & listFiles("tests"):
     if f.endsWith(".nim"):
+      let quotedFile = quoteShell(f)
+      let quotedBackup = quoteShell(f & ".bak")
       cpFile(f, f & ".bak")
-      let (fmtOut, fmtCode) = gorgeEx("nimpretty --maxLineLen:100 " & f)
+      let (_, fmtCode) = gorgeEx("nimpretty --maxLineLen:100 " & quotedFile)
       if fmtCode != 0:
         echo "nimpretty failed on: " & f
         failed = true
       else:
-        let (_, diffCode) = gorgeEx("diff -q " & f & " " & f & ".bak")
+        let (_, diffCode) = gorgeEx("diff -q " & quotedFile & " " & quotedBackup)
         if diffCode != 0:
           echo "Not formatted: " & f
           failed = true
@@ -48,3 +62,5 @@ task check, "Run format check, build, and tests":
   exec "nimble build -y"
   # Tests
   exec "nimble test -y"
+  # Smoke
+  exec "nimble smoke_script -y"

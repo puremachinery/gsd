@@ -18,21 +18,23 @@ Thanks for your interest in contributing. Here's how to get started.
    ```
    This enables:
    - `pre-commit`: fast `nimpretty` format check for staged installer `.nim` files
-   - `pre-push`: full `nimble check` (format check + build + tests)
+   - `pre-push`: full `nimble verify` (format check + build + tests + bootstrap smoke)
 
 ## Development Workflow
 
 - Source is in `installer/src/`, tests in `installer/tests/`
 - Format code: `nimble format` (enforced by CI)
 - Run tests: `nimble test`
-- Full check before pushing: `nimble check`
+- Run bootstrap smoke: `nimble smoke`
+- Run live `new-project` smoke manually: `./scripts/smoke/live-new-project.sh installer/gsd` (requires Codex auth)
+- Full check before pushing: `nimble verify`
 
 ## Making Changes
 
 1. Create a branch from `master`
 2. Make your changes
 3. Add or update tests for any new behavior
-4. Run `nimble check` to verify formatting, build, and tests all pass
+4. Run `nimble verify` to verify formatting, build, tests, and bootstrap smoke all pass
 5. Open a pull request
 
 ## Code Style

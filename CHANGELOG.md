@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Deterministic bootstrap smoke contract (`nimble smoke`) that installs GSD into a temp project and verifies runtime, prompt rewrites, and managed-binary behavior
+- Manual live `gsd:new-project` smoke workflow and Codex runner script for real end-to-end project initialization
+
+### Changed
+- Local full-project validation now runs via `nimble verify` because `nimble check` is reserved for Nimble's built-in package validation
+
+### Fixed
+- Bundled prompt reference files now ship with GSD (`questioning.md`, `ui-brand.md`, `project.md`, `requirements.md`) so `gsd:new-project` and related workflows can actually resolve their referenced context at runtime
+
 ---
 
 ## [0.3.3] - 2026-02-16
