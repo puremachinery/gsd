@@ -74,6 +74,9 @@ project_dir="$(resolve_path "$project_dir")"
 
 prepare_codex_home
 
+HOME="$codex_home_root" git config --global user.name "GSD Smoke"
+HOME="$codex_home_root" git config --global user.email "gsd-smoke@example.com"
+
 (
   cd "$project_dir"
   "$GSD_BIN" install --platform=codex --local >/dev/null
