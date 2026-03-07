@@ -65,10 +65,11 @@ select_python() {
     printf '%s\n' "python3"
     return 0
   fi
-  if command -v python >/dev/null 2>&1; then
+  if command -v python >/dev/null 2>&1 &&
+    python -c 'import sys; raise SystemExit(0 if sys.version_info[0] == 3 else 1)' >/dev/null 2>&1; then
     printf '%s\n' "python"
     return 0
   fi
 
-  fail "python3 or python is required"
+  fail "python3-compatible interpreter is required"
 }

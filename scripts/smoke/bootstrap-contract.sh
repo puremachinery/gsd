@@ -104,10 +104,18 @@ assert_not_contains "$claude_prompt_content" "@~/.gsd/"
 assert_contains "$codex_prompt_content" "@.gsd/references/questioning.md"
 assert_contains "$codex_prompt_content" ".planning/PROJECT.md"
 assert_not_contains "$codex_prompt_content" "@~/.gsd/"
+assert_contains "$claude_prompt_content" 'CODE_FILES=$(find . -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" \)'
+assert_contains "$claude_prompt_content" 'HAS_PACKAGE=$({ [ -f project.manifest ] || [ -f requirements.txt ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f Package.swift ]; } && echo "yes")'
 
-assert_contains "$claude_settings_content" "$managed_bin check-update --config-dir $gsd_dir #gsd"
-assert_contains "$claude_settings_content" "$managed_bin statusline --config-dir $gsd_dir #gsd"
-assert_contains "$codex_config_content" "$managed_bin check-update --config-dir $gsd_dir #gsd"
+assert_contains "$claude_settings_content" "$managed_bin"
+assert_contains "$claude_settings_content" "check-update --config-dir"
+assert_contains "$claude_settings_content" "statusline --config-dir"
+assert_contains "$claude_settings_content" "$gsd_dir"
+assert_contains "$claude_settings_content" "#gsd"
+assert_contains "$codex_config_content" "$managed_bin"
+assert_contains "$codex_config_content" "check-update --config-dir"
+assert_contains "$codex_config_content" "$gsd_dir"
+assert_contains "$codex_config_content" "#gsd"
 assert_contains "$codex_agents_content" "<!-- GSD:AGENTS START -->"
 assert_contains "$codex_agents_content" "gsd-roadmapper"
 

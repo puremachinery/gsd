@@ -24,12 +24,12 @@ task format, "Format source with nimpretty":
     if f.endsWith(".nim"):
       exec "nimpretty --maxLineLen:100 " & f
 
-task smokeScript, "Run the bootstrap smoke contract script":
+task smoke_script, "Run the bootstrap smoke contract script":
   exec "bash ../scripts/smoke/bootstrap-contract.sh gsd"
 
 task smoke, "Run bootstrap smoke contract":
   exec "nimble build -y"
-  exec "nimble smokeScript -y"
+  exec "nimble smoke_script -y"
 
 task verify, "Run format check, build, tests, and bootstrap smoke":
   # Format check (diff-based, non-destructive)
@@ -56,4 +56,4 @@ task verify, "Run format check, build, tests, and bootstrap smoke":
   # Tests
   exec "nimble test -y"
   # Smoke
-  exec "nimble smokeScript -y"
+  exec "nimble smoke_script -y"
