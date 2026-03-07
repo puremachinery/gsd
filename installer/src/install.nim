@@ -15,6 +15,7 @@ const
   ManagedRuntimeDirName = "runtime"
   ManagedRuntimeBinDirName = "bin"
   ManagedBinaryName = when defined(windows): "gsd.exe" else: "gsd"
+  ManagedRuntimeSourceDirs = [("gsd", true), ("commands", true), ("agents", false)]
 
 type
   InstallOptions* = object
@@ -341,8 +342,8 @@ proc getManagedBinaryPath*(gsdDir: string): string =
   getManagedRuntimeDir(gsdDir) / ManagedRuntimeBinDirName / ManagedBinaryName
 
 proc normalizedPathString(path: string): string =
-  result = absolutePath(path)
-  normalizePath(result)
+  ## Normalize a path for comparison, resolving symlinks using platform logic.
+  result = resolvedPath(path)
 
 proc samePath(a, b: string): bool =
   normalizedPathString(a) == normalizedPathString(b)
@@ -367,7 +368,7 @@ proc installManagedRuntime(sourceDir, gsdDir: string, verbose: bool): bool =
     return false
 
   if not samePath(sourceDir, runtimeDir):
-    for (name, required) in [("gsd", true), ("commands", true), ("agents", false)]:
+    for (name, required) in ManagedRuntimeSourceDirs:
       let src = sourceDir / name
       if not dirExists(src):
         if required:
