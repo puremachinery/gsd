@@ -83,6 +83,10 @@ run_project_bash() {
 [ "$#" -eq 1 ] || usage
 
 require_cmd bash
+require_cmd find
+require_cmd git
+require_cmd grep
+require_cmd mktemp
 GSD_BIN="$(resolve_path "$1")"
 [ -f "$GSD_BIN" ] || fail "gsd binary not found: $GSD_BIN"
 [ -x "$GSD_BIN" ] || fail "gsd binary is not executable: $GSD_BIN"

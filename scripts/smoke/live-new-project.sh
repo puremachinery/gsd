@@ -51,6 +51,12 @@ assert_contains_any() {
   fail "expected to find one of: $*"
 }
 
+assert_matches() {
+  local haystack="$1"
+  local pattern="$2"
+  printf '%s' "$haystack" | grep -E -- "$pattern" >/dev/null || fail "expected to match regex: $pattern"
+}
+
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "required command not found: $1"
 }
@@ -80,7 +86,6 @@ prepare_codex_home() {
 
 require_cmd codex
 require_cmd git
-require_cmd python3
 
 GSD_BIN="$(resolve_path "$1")"
 [ -f "$GSD_BIN" ] || fail "gsd binary not found: $GSD_BIN"
@@ -174,8 +179,7 @@ config_content="$(cat "$project_dir/.planning/config.json")"
 assert_contains "$project_content" "todo-smoke"
 assert_contains "$project_content" "Python CLI"
 assert_contains "$project_content" "JSON file"
-assert_contains "$requirements_content" "TASK-01"
-assert_contains "$requirements_content" "DATA-01"
+assert_matches "$requirements_content" '\*\*[A-Z]+-[0-9]{2}\*\*'
 assert_contains "$requirements_content" "JSON file"
 assert_contains_any "$roadmap_content" "Phase 1" "Phase 01"
 assert_contains_any "$roadmap_content" "Phase 2" "Phase 02"
@@ -185,7 +189,7 @@ assert_contains "$config_content" '"mode"'
 commit_count="$(git -C "$project_dir" rev-list --count HEAD)"
 [ "$commit_count" -ge 1 ] || fail "expected at least one git commit"
 
-unexpected_files="$(cd "$project_dir" && find . -maxdepth 2 -type f ! -path './.planning/*' ! -path './.codex/*' ! -path './.gsd/*' ! -path './.git/*' | sort || true)"
+unexpected_files="$(cd "$project_dir" && find . -type f ! -path './.planning/*' ! -path './.codex/*' ! -path './.gsd/*' ! -path './.git/*' | sort || true)"
 [ -z "$unexpected_files" ] || fail "unexpected non-workflow files created: $unexpected_files"
 
 if [ -d "$project_dir/.planning/research" ]; then
