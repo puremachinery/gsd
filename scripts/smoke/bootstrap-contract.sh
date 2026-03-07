@@ -43,7 +43,7 @@ PYTHON_BIN="$(select_python)"
 tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/gsd-bootstrap-smoke.XXXXXX")"
 cleanup() {
   local exit_code=$?
-  if [ "$exit_code" -ne 0 ] || [ -n "${GSD_SMOKE_PRESERVE_TMP:-}" ]; then
+  if [ "$exit_code" -ne 0 ] || [ "${GSD_SMOKE_PRESERVE_TMP:-0}" = "1" ]; then
     printf 'Bootstrap smoke artifacts preserved at %s\n' "$tmp_root" >&2
     return
   fi
@@ -142,12 +142,18 @@ assert_contains "$git_output" "Initialized new git repo"
 assert_dir "$project_dir/.git"
 
 brownfield_output="$(run_project_bash 'CODE_FILES=$(find . -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" \) | grep -v deps | grep -v .git | head -20)
-HAS_PACKAGE=$([ -f project.manifest ] || [ -f requirements.txt ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f Package.swift ] && echo "yes")
+HAS_PACKAGE=$({ [ -f project.manifest ] || [ -f requirements.txt ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f Package.swift ]; } && echo "yes")
 HAS_CODEBASE_MAP=$([ -d .planning/codebase ] && echo "yes")
 printf "CODE_FILES=%s\nHAS_PACKAGE=%s\nHAS_CODEBASE_MAP=%s\n" "$CODE_FILES" "$HAS_PACKAGE" "$HAS_CODEBASE_MAP"')"
 printf '%s\n' "$brownfield_output" | grep -Fx 'CODE_FILES=' >/dev/null || fail "expected no brownfield code files"
 printf '%s\n' "$brownfield_output" | grep -Fx 'HAS_PACKAGE=' >/dev/null || fail "expected no package manifest"
 printf '%s\n' "$brownfield_output" | grep -Fx 'HAS_CODEBASE_MAP=' >/dev/null || fail "expected no codebase map"
+
+touch "$project_dir/requirements.txt"
+package_detection_output="$(run_project_bash 'HAS_PACKAGE=$({ [ -f project.manifest ] || [ -f requirements.txt ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f Package.swift ]; } && echo "yes")
+printf "HAS_PACKAGE=%s\n" "$HAS_PACKAGE"')"
+printf '%s\n' "$package_detection_output" | grep -Fx 'HAS_PACKAGE=yes' >/dev/null || fail "expected manifest detection to recognize requirements.txt"
+rm "$project_dir/requirements.txt"
 
 mkdir -p "$project_dir/.planning"
 cat > "$project_dir/.planning/STATE.md" <<'EOF_STATE'
