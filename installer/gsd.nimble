@@ -1,3 +1,5 @@
+import os
+
 # Package
 version       = "0.3.3"
 author        = "Zera Alexander"
@@ -22,7 +24,7 @@ task test, "Run tests":
 task format, "Format source with nimpretty":
   for f in listFiles("src") & listFiles("tests"):
     if f.endsWith(".nim"):
-      exec "nimpretty --maxLineLen:100 " & f
+      exec "nimpretty --maxLineLen:100 " & quoteShell(f)
 
 task smoke_script, "Run the bootstrap smoke contract script":
   exec "bash ../scripts/smoke/bootstrap-contract.sh gsd"
@@ -36,13 +38,15 @@ task verify, "Run format check, build, tests, and bootstrap smoke":
   var failed = false
   for f in listFiles("src") & listFiles("tests"):
     if f.endsWith(".nim"):
+      let quotedFile = quoteShell(f)
+      let quotedBackup = quoteShell(f & ".bak")
       cpFile(f, f & ".bak")
-      let (fmtOut, fmtCode) = gorgeEx("nimpretty --maxLineLen:100 " & f)
+      let (_, fmtCode) = gorgeEx("nimpretty --maxLineLen:100 " & quotedFile)
       if fmtCode != 0:
         echo "nimpretty failed on: " & f
         failed = true
       else:
-        let (_, diffCode) = gorgeEx("diff -q " & f & " " & f & ".bak")
+        let (_, diffCode) = gorgeEx("diff -q " & quotedFile & " " & quotedBackup)
         if diffCode != 0:
           echo "Not formatted: " & f
           failed = true
