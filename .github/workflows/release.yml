@@ -19,6 +19,9 @@ jobs:
           - os: macos-14
             bundle: gsd-darwin-arm64
             archive: tar.gz
+          - os: macos-13
+            bundle: gsd-darwin-x64
+            archive: tar.gz
           - os: ubuntu-latest
             bundle: gsd-linux-x64
             archive: tar.gz

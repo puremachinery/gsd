@@ -471,8 +471,11 @@ suite "Codex install integration":
     # Check config.toml in tool dir
     check fileExists(toolDir / "config.toml")
     let tomlContent = readFile(toolDir / "config.toml")
+    let managedBinary = getManagedBinaryPath(gsdDir)
+    check fileExists(managedBinary)
     check tomlContent.contains("[[notify]]")
     check tomlContent.contains("#gsd")
+    check tomlContent.contains(managedBinary)
 
     # Check gsd-config.json in .gsd/
     check fileExists(gsdDir / "gsd-config.json")
@@ -752,16 +755,20 @@ suite "Claude Code install integration":
     check fileExists(toolDir / "settings.json")
     let settingsContent = readFile(toolDir / "settings.json")
     let settings = parseJson(settingsContent)
+    let managedBinary = getManagedBinaryPath(gsdDir)
+    check fileExists(managedBinary)
     check settings.hasKey("hooks")
     check settings.hasKey("statusLine")
 
     # Check hooks contain GSD hook
     let hooks = settings["hooks"]
     check hooks.hasKey("SessionStart")
+    check hooks["SessionStart"][0]["hooks"][0]["command"].getStr().contains(managedBinary)
 
     # Check statusLine has GSD statusline
     let statusLine = settings["statusLine"]
     check statusLine["command"].getStr().contains("#gsd")
+    check statusLine["command"].getStr().contains(managedBinary)
 
     # Check gsd-config.json in .gsd/
     check fileExists(gsdDir / "gsd-config.json")
@@ -971,6 +978,7 @@ suite "legacy migration":
 
     let gsdDir = resolvedWork / ".gsd"
     let toolDir = resolvedWork / ".claude"
+    let runtimeDir = getManagedRuntimeDir(gsdDir)
 
     # Pre-create dirs to simulate an update (both existed before)
     createDir(gsdDir)
@@ -997,6 +1005,11 @@ suite "legacy migration":
     check dirExists(toolDir)
     check fileExists(gsdDir / "existing-file.txt")
     check fileExists(toolDir / "existing-file.txt")
+    check not dirExists(runtimeDir)
+    check not dirExists(runtimeDir & ".bak")
+
+    for kind, path in walkDir(gsdDir):
+      check not extractFilename(path).startsWith("runtime.tmp.")
 
     # Clean up
     removeDir(toolDir / "settings.json")

@@ -2,6 +2,7 @@
 
 import std/[unittest, os, osproc, strutils, json, envvars, streams, times]
 import ../src/config
+import ../src/install
 import ../src/platform
 
 proc repoRoot(): string =
@@ -35,6 +36,22 @@ proc buildGsdBinary(): string =
     raise newException(OSError, "Failed to build gsd binary: " & output)
 
   return binPath
+
+type
+  CommandResult = object
+    code: int
+    output: string
+
+proc runCli(bin: string, args: seq[string], workingDir: string): CommandResult =
+  let p = startProcess(
+    bin,
+    args = args,
+    options = {poUsePath, poStdErrToStdOut},
+    workingDir = workingDir
+  )
+  result.output = readAll(p.outputStream)
+  result.code = p.waitForExit()
+  p.close()
 
 proc prepareWorkspace(): string =
   let workDir = getTempDir() / ("gsd_cli_work_" & $epochTime().int)
@@ -184,6 +201,81 @@ suite "CLI integration":
     # .gsd/ dirs should be removed (only platform was claude)
     check not dirExists(localGsd)
     check not dirExists(globalGsd)
+
+  test "install writes managed runtime hook commands":
+    let bin = buildGsdBinary()
+    let workDir = prepareWorkspace()
+    let sandbox = setupHomeSandbox("gsd_cli_runtime_local_")
+    defer:
+      teardownHomeSandbox(sandbox)
+      removeDir(workDir)
+
+    let installResult = runCli(
+      bin,
+      @["install", "--platform=claude", "--local"],
+      workDir
+    )
+
+    check installResult.code == 0
+
+    let gsdDir = workDir / ".gsd"
+    let managedBinary = getManagedBinaryPath(gsdDir)
+    let settings = parseJson(readFile(workDir / ".claude" / "settings.json"))
+
+    check fileExists(managedBinary)
+    check settings["hooks"]["SessionStart"][0]["hooks"][0]["command"].getStr().contains(managedBinary)
+    check settings["statusLine"]["command"].getStr().contains(managedBinary)
+
+  test "managed runtime binary supports global update from arbitrary directory":
+    let bin = buildGsdBinary()
+    let workDir = prepareWorkspace()
+    let runDir = getTempDir() / ("gsd_cli_runtime_run_" & $epochTime().int)
+    let sandbox = setupHomeSandbox("gsd_cli_runtime_global_")
+    createDir(runDir)
+    defer:
+      teardownHomeSandbox(sandbox)
+      removeDir(workDir)
+      removeDir(runDir)
+
+    let installResult = runCli(
+      bin,
+      @["install", "--platform=claude", "--global"],
+      workDir
+    )
+
+    check installResult.code == 0
+
+    let gsdDir = sandbox.tempHome / ".gsd"
+    let managedBinary = getManagedBinaryPath(gsdDir)
+    check fileExists(managedBinary)
+
+    let updateResult = runCli(
+      managedBinary,
+      @["update", "--platform=claude"],
+      runDir
+    )
+
+    check updateResult.code == 0
+    check updateResult.output.contains("Update complete!")
+    check fileExists(gsdDir / VersionFileName)
+
+  test "unknown flags fail fast across non-install commands":
+    let bin = buildGsdBinary()
+    let workDir = prepareWorkspace()
+    defer: removeDir(workDir)
+
+    let cases = [
+      @["uninstall", "--bogus"],
+      @["doctor", "--bogus"],
+      @["check-update", "--bogus"],
+      @["statusline", "--bogus"],
+      @["update", "--bogus"]
+    ]
+
+    for args in cases:
+      let result = runCli(bin, args, workDir)
+      check result.code != 0
+      check result.output.contains("Unknown option: bogus")
 
   test "doctor --platform ignores GSD_CONFIG_DIR for mismatched platform":
     let bin = buildGsdBinary()
