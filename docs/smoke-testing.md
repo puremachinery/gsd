@@ -59,12 +59,6 @@ cd ..
 
 For local debugging, preserve artifacts with `GSD_SMOKE_PRESERVE_TMP=1` for the contract smoke or `GSD_LIVE_SMOKE_PRESERVE=1` for the live smoke.
 
-Or run the manual GitHub Actions workflow:
-
-- workflow: `Live Smoke`
-- trigger: `workflow_dispatch`
-- secret required: `OPENAI_API_KEY`
-
 The live smoke script at `scripts/smoke/live-new-project.sh` does this:
 
 1. Creates a fresh temp project.
@@ -84,6 +78,8 @@ The live smoke script at `scripts/smoke/live-new-project.sh` does this:
 9. Fails if the model drifts into implementation or optional research.
 
 This is the test that actually smokes the `new-project` workflow end to end.
+
+This live smoke is intentionally local-only. It is meant for real end-to-end verification when needed, without adding hosted auth, CLI-install, and provider-runtime maintenance to the repository.
 
 ## Why PR CI Still Stops At The Contract Layer
 
