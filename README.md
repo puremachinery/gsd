@@ -43,7 +43,7 @@ https://github.com/puremachinery/gsd/releases
 Then:
 
 ```bash
-# Extract the release bundle
+# Extract the release bundle for your architecture
 tar -xzf gsd-darwin-arm64.tar.gz
 cd gsd-darwin-arm64
 
@@ -65,10 +65,9 @@ so you can remove the extracted release bundle after installation.
 
 Release bundles are available for:
 - macOS (Apple Silicon): `gsd-darwin-arm64.tar.gz`
+- macOS (Intel): `gsd-darwin-x64.tar.gz`
 - Linux (x64): `gsd-linux-x64.tar.gz`
 - Windows (x64): `gsd-windows-x64.zip`
-
-Intel macOS is not currently shipped as a release artifact.
 
 ### Windows Quickstart (PowerShell)
 
