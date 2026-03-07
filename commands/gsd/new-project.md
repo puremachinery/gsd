@@ -59,9 +59,17 @@ This is the most leveraged moment in any project. Deep questioning here means be
 
 3. **Detect existing code (brownfield detection):**
    ```bash
-   CODE_FILES=$(find . -path './.git' -prune -o -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" \) -print 2>/dev/null | grep -v deps | head -20)
-   HAS_PACKAGE=$({ [ -f project.manifest ] || [ -f requirements.txt ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f Package.swift ]; } && echo "yes")
-   HAS_CODEBASE_MAP=$([ -d .planning/codebase ] && echo "yes")
+   CODE_FILES=$(find . \( -path './.git' -o -path './deps' \) -prune -o -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" -o -name "*.js" -o -name "*.jsx" -o -name "*.ts" -o -name "*.tsx" \) -print 2>/dev/null | head -20)
+   if [ -f project.manifest ] || [ -f requirements.txt ] || [ -f pyproject.toml ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f package.json ] || [ -f Package.swift ]; then
+       HAS_PACKAGE="yes"
+   else
+       HAS_PACKAGE=""
+   fi
+   if [ -d .planning/codebase ]; then
+       HAS_CODEBASE_MAP="yes"
+   else
+       HAS_CODEBASE_MAP=""
+   fi
    ```
 
    **You MUST run all bash commands above using the Bash tool before proceeding.**

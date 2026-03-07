@@ -24,7 +24,7 @@ run_in_project() {
 run_project_bash() {
   (
     cd "$project_dir"
-    env -u GSD_CONFIG_DIR HOME="$temp_home" bash -c "$1"
+    env -u GSD_CONFIG_DIR HOME="$temp_home" bash -euo pipefail -c "$1"
   )
 }
 
@@ -104,8 +104,11 @@ assert_not_contains "$claude_prompt_content" "@~/.gsd/"
 assert_contains "$codex_prompt_content" "@.gsd/references/questioning.md"
 assert_contains "$codex_prompt_content" ".planning/PROJECT.md"
 assert_not_contains "$codex_prompt_content" "@~/.gsd/"
-assert_contains "$claude_prompt_content" 'CODE_FILES=$(find . -path '\''./.git'\'' -prune -o -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" \) -print 2>/dev/null | grep -v deps | head -20)'
-assert_contains "$claude_prompt_content" 'HAS_PACKAGE=$({ [ -f project.manifest ] || [ -f requirements.txt ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f Package.swift ]; } && echo "yes")'
+assert_contains "$claude_prompt_content" 'CODE_FILES=$(find . \( -path '\''./.git'\'' -o -path '\''./deps'\'' \) -prune -o -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" -o -name "*.js" -o -name "*.jsx" -o -name "*.ts" -o -name "*.tsx" \) -print 2>/dev/null | head -20)'
+assert_contains "$claude_prompt_content" 'if [ -f project.manifest ] || [ -f requirements.txt ] || [ -f pyproject.toml ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f package.json ] || [ -f Package.swift ]; then'
+assert_contains "$claude_prompt_content" 'HAS_PACKAGE="yes"'
+assert_contains "$claude_prompt_content" 'if [ -d .planning/codebase ]; then'
+assert_contains "$claude_prompt_content" 'HAS_CODEBASE_MAP="yes"'
 
 assert_contains "$claude_settings_content" "$managed_bin"
 assert_contains "$claude_settings_content" "check-update --config-dir"
@@ -149,19 +152,48 @@ fi')"
 assert_contains "$git_output" "Initialized new git repo"
 assert_dir "$project_dir/.git"
 
-brownfield_output="$(run_project_bash 'CODE_FILES=$(find . -path '\''./.git'\'' -prune -o -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" \) -print 2>/dev/null | grep -v deps | head -20)
-HAS_PACKAGE=$({ [ -f project.manifest ] || [ -f requirements.txt ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f Package.swift ]; } && echo "yes")
-HAS_CODEBASE_MAP=$([ -d .planning/codebase ] && echo "yes")
+brownfield_output="$(run_project_bash 'CODE_FILES=$(find . \( -path '\''./.git'\'' -o -path '\''./deps'\'' \) -prune -o -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" -o -name "*.js" -o -name "*.jsx" -o -name "*.ts" -o -name "*.tsx" \) -print 2>/dev/null | head -20)
+if [ -f project.manifest ] || [ -f requirements.txt ] || [ -f pyproject.toml ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f package.json ] || [ -f Package.swift ]; then
+  HAS_PACKAGE="yes"
+else
+  HAS_PACKAGE=""
+fi
+if [ -d .planning/codebase ]; then
+  HAS_CODEBASE_MAP="yes"
+else
+  HAS_CODEBASE_MAP=""
+fi
 printf "CODE_FILES=%s\nHAS_PACKAGE=%s\nHAS_CODEBASE_MAP=%s\n" "$CODE_FILES" "$HAS_PACKAGE" "$HAS_CODEBASE_MAP"')"
 printf '%s\n' "$brownfield_output" | grep -Fx 'CODE_FILES=' >/dev/null || fail "expected no brownfield code files"
 printf '%s\n' "$brownfield_output" | grep -Fx 'HAS_PACKAGE=' >/dev/null || fail "expected no package manifest"
 printf '%s\n' "$brownfield_output" | grep -Fx 'HAS_CODEBASE_MAP=' >/dev/null || fail "expected no codebase map"
 
 touch "$project_dir/requirements.txt"
-package_detection_output="$(run_project_bash 'HAS_PACKAGE=$({ [ -f project.manifest ] || [ -f requirements.txt ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f Package.swift ]; } && echo "yes")
+package_detection_output="$(run_project_bash 'if [ -f project.manifest ] || [ -f requirements.txt ] || [ -f pyproject.toml ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f package.json ] || [ -f Package.swift ]; then
+  HAS_PACKAGE="yes"
+else
+  HAS_PACKAGE=""
+fi
 printf "HAS_PACKAGE=%s\n" "$HAS_PACKAGE"')"
 printf '%s\n' "$package_detection_output" | grep -Fx 'HAS_PACKAGE=yes' >/dev/null || fail "expected manifest detection to recognize requirements.txt"
 rm "$project_dir/requirements.txt"
+
+cat > "$project_dir/package.json" <<'EOF_PACKAGE'
+{
+  "name": "smoke-fixture"
+}
+EOF_PACKAGE
+touch "$project_dir/app.ts"
+js_brownfield_output="$(run_project_bash 'CODE_FILES=$(find . \( -path '\''./.git'\'' -o -path '\''./deps'\'' \) -prune -o -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" -o -name "*.js" -o -name "*.jsx" -o -name "*.ts" -o -name "*.tsx" \) -print 2>/dev/null | head -20)
+if [ -f project.manifest ] || [ -f requirements.txt ] || [ -f pyproject.toml ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f package.json ] || [ -f Package.swift ]; then
+  HAS_PACKAGE="yes"
+else
+  HAS_PACKAGE=""
+fi
+printf "CODE_FILES=%s\nHAS_PACKAGE=%s\n" "$CODE_FILES" "$HAS_PACKAGE"')"
+printf '%s\n' "$js_brownfield_output" | grep -Fx 'CODE_FILES=./app.ts' >/dev/null || fail "expected TypeScript brownfield detection"
+printf '%s\n' "$js_brownfield_output" | grep -Fx 'HAS_PACKAGE=yes' >/dev/null || fail "expected package.json brownfield detection"
+rm "$project_dir/package.json" "$project_dir/app.ts"
 
 mkdir -p "$project_dir/.planning"
 cat > "$project_dir/.planning/STATE.md" <<'EOF_STATE'
