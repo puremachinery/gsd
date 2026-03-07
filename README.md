@@ -128,11 +128,12 @@ git clone https://github.com/puremachinery/gsd.git
 cd gsd/installer
 nimble build          # build the binary
 nimble test           # run tests
+nimble smoke          # temp-dir install/bootstrap smoke
 nimble format         # format code with nimpretty
-nimble check          # format check + build + test (used by pre-push hook)
+nimble verify         # format check + build + test + smoke (used by pre-push hook)
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/smoke-testing.md](docs/smoke-testing.md) for development and smoke-test details.
 
 ## Attribution
 

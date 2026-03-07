@@ -6,6 +6,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Deterministic bootstrap smoke contract (`nimble smoke`) that installs GSD into a temp project and verifies runtime, prompt rewrites, and managed-binary behavior
+
+### Changed
+- Local full-project validation now runs via `nimble verify` because `nimble check` is reserved for Nimble's built-in package validation
+
 ---
 
 ## [0.3.3] - 2026-02-16
@@ -41,7 +47,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub API retry logic (1 retry with 500ms delay on network/timeout errors)
 - Update cache lifecycle tests (isCacheValid, loadCachedResult, saveCacheResult, ETag round-trip)
 - Claude Code install end-to-end tests (full structure verification, rollback validation)
-- Pre-push hook and `nimble check` task for local validation
+- Pre-push hook and `nimble verify` task for local validation
 - CONTRIBUTING.md and GitHub issue template
 
 ### Fixed
