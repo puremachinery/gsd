@@ -162,6 +162,10 @@ proc showUpdateCommandHelp() =
   echoVerboseOption()
   quit(0)
 
+proc failUnknownOption(key: string) =
+  stderr.writeLine "Unknown option: ", key
+  quit(1)
+
 proc findSourceDir(): string =
   ## Find the source directory containing gsd/, commands/, agents/
   ## This is where the installer binary is run from
@@ -229,8 +233,7 @@ proc cmdInstall(args: seq[string]) =
       of "h", "help":
         showInstallCommandHelp()
       else:
-        stderr.writeLine "Unknown option: ", p.key
-        quit(1)
+        failUnknownOption(p.key)
     of cmdArgument:
       discard
 
@@ -337,7 +340,7 @@ proc cmdUninstall(args: seq[string]) =
       of "h", "help":
         showUninstallCommandHelp()
       else:
-        discard
+        failUnknownOption(p.key)
     of cmdArgument:
       discard
 
@@ -635,7 +638,7 @@ proc cmdDoctor(args: seq[string]) =
         echo "  -p, --platform <name>     Target: claude or codex"
         quit(0)
       else:
-        discard
+        failUnknownOption(p.key)
     of cmdArgument:
       discard
 
@@ -833,7 +836,7 @@ proc cmdCheckUpdate(args: seq[string]) =
         echo "  -c, --config-dir <path>   Check a specific config directory"
         quit(0)
       else:
-        discard
+        failUnknownOption(p.key)
     of cmdArgument:
       discard
 
@@ -862,7 +865,7 @@ proc cmdStatusline(args: seq[string]) =
         echo "  -c, --config-dir <path>   Use a specific config directory"
         quit(0)
       else:
-        discard
+        failUnknownOption(p.key)
     of cmdArgument:
       discard
 
@@ -898,7 +901,7 @@ proc cmdUpdate(args: seq[string]) =
       of "h", "help":
         showUpdateCommandHelp()
       else:
-        discard
+        failUnknownOption(p.key)
     of cmdArgument:
       discard
 

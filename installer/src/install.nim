@@ -12,6 +12,9 @@ const
     "node .claude/hooks/statusline.js",
     "node $HOME/.claude/hooks/statusline.js"
   ]
+  ManagedRuntimeDirName = "runtime"
+  ManagedRuntimeBinDirName = "bin"
+  ManagedBinaryName = when defined(windows): "gsd.exe" else: "gsd"
 
 type
   InstallOptions* = object
@@ -329,6 +332,65 @@ proc writeVersionFile(gsdDir: string): bool =
   except IOError:
     return false
 
+proc getManagedRuntimeDir*(gsdDir: string): string =
+  ## Directory that stores the self-contained managed runtime bundle.
+  gsdDir / ManagedRuntimeDirName
+
+proc getManagedBinaryPath*(gsdDir: string): string =
+  ## Stable binary path used by installed hooks and statusline commands.
+  getManagedRuntimeDir(gsdDir) / ManagedRuntimeBinDirName / ManagedBinaryName
+
+proc normalizedPathString(path: string): string =
+  result = absolutePath(path)
+  normalizePath(result)
+
+proc samePath(a, b: string): bool =
+  normalizedPathString(a) == normalizedPathString(b)
+
+proc installManagedRuntime(sourceDir, gsdDir: string, verbose: bool): bool =
+  ## Install a managed runtime bundle under .gsd/runtime/ so hooks do not
+  ## depend on the transient binary path used during installation.
+  let runtimeDir = getManagedRuntimeDir(gsdDir)
+  let runtimeBinDir = runtimeDir / ManagedRuntimeBinDirName
+  let managedBinaryPath = getManagedBinaryPath(gsdDir)
+  let selfPath = getAppFilename()
+
+  if selfPath.len == 0 or not fileExists(selfPath):
+    stderr.writeLine "Error: Cannot locate the running gsd binary."
+    return false
+
+  try:
+    createDir(runtimeDir)
+    createDir(runtimeBinDir)
+  except OSError as e:
+    stderr.writeLine "Error creating managed runtime directory: ", e.msg
+    return false
+
+  if not samePath(sourceDir, runtimeDir):
+    for (name, required) in [("gsd", true), ("commands", true), ("agents", false)]:
+      let src = sourceDir / name
+      if not dirExists(src):
+        if required:
+          stderr.writeLine "Error: Managed runtime source missing ", src
+          return false
+        continue
+      if not copyDirRecursive(src, runtimeDir / name, verbose):
+        return false
+
+  if not samePath(selfPath, managedBinaryPath):
+    try:
+      copyFile(selfPath, managedBinaryPath)
+      try:
+        setFilePermissions(managedBinaryPath, getFilePermissions(selfPath))
+      except OSError:
+        discard
+      log("Installed managed runtime binary", verbose)
+    except OSError as e:
+      stderr.writeLine "Error copying managed runtime binary: ", e.msg
+      return false
+
+  return true
+
 proc cleanupOldFiles(configDir: string, verbose: bool) =
   ## Remove legacy hook files from previous installations
   let oldFiles = [
@@ -359,30 +421,6 @@ proc cleanupOldFiles(configDir: string, verbose: bool) =
         log("Removed empty hooks directory", verbose)
     except OSError:
       discard
-
-proc findGsdBinary(): tuple[path: string, notFound: bool] =
-  ## Find the gsd binary path (for settings.json commands)
-  ## Returns (path, notFound) where notFound=true means binary wasn't found
-  ## in standard locations and we're falling back to bare "gsd" (assumes PATH)
-
-  # First check if we're running from a known location
-  let selfPath = getAppFilename()
-  if selfPath.len > 0 and fileExists(selfPath):
-    return (selfPath, false)
-
-  # Check common locations
-  let locations = [
-    "/usr/local/bin/gsd",
-    getHomeDir() / ".local" / "bin" / "gsd",
-    getHomeDir() / "bin" / "gsd"
-  ]
-
-  for loc in locations:
-    if fileExists(loc):
-      return (loc, false)
-
-  # Fallback to just "gsd" (assumes in PATH)
-  return ("gsd", true)
 
 const
   # GSD agent files - only these are installed/removed
@@ -711,6 +749,7 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
   if opts.dryRun:
     echo "[dry-run] Would install GSD to ", gsdDir, " + ", toolDir, " (Codex CLI)..."
     echo "  Would install shared resources to ", gsdDir
+    echo "  Would install managed runtime to ", getManagedRuntimeDir(gsdDir)
     echo "  Would write VERSION and ensure cache/ in ", gsdDir
     echo "  Would install prompts to ", toolDir / CodexPromptsDir
     echo "  Would merge managed GSD section into ", toolDir / CodexAgentsMdFile
@@ -733,6 +772,12 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
         result.message = "Failed to create directory: " & e.msg
         cleanupOnFailure(state)
         return
+
+  if not installManagedRuntime(sourceDir, gsdDir, opts.verbose):
+    result.success = false
+    result.message = "Failed to install managed runtime"
+    cleanupOnFailure(state)
+    return
 
   echo "Installing GSD to ", gsdDir, " + ", toolDir, " (Codex CLI)..."
 
@@ -792,12 +837,7 @@ proc installCodex*(sourceDir: string, opts: InstallOptions): InstallResult =
   # Update config.toml (using text-based merge to preserve unknown content)
   let configTomlPath = toolDir / CodexConfigFile
 
-  let (gsdBinaryPath, gsdNotFound) = findGsdBinary()
-
-  if gsdNotFound:
-    echo "  Warning: gsd binary not found in standard locations."
-    echo "           Hooks will use 'gsd' and assume it's in PATH."
-    echo "           Consider moving gsd to /usr/local/bin/ or ~/.local/bin/"
+  let gsdBinaryPath = getManagedBinaryPath(gsdDir)
 
   # Merge notify hooks using text-based approach (--config-dir points to .gsd/)
   let gsdNotifyHooks = createGsdNotifyHooks(gsdBinaryPath, gsdDir)
@@ -872,6 +912,7 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
   if opts.dryRun:
     echo "[dry-run] Would install GSD to ", gsdDir, " + ", toolDir, "..."
     echo "  Would install shared resources to ", gsdDir
+    echo "  Would install managed runtime to ", getManagedRuntimeDir(gsdDir)
     echo "  Would write VERSION and ensure cache/ in ", gsdDir
     echo "  Would install commands to ", toolDir / "commands" / "gsd"
     echo "  Would install managed GSD agent files into ", toolDir / "agents"
@@ -894,6 +935,12 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
         result.message = "Failed to create directory: " & e.msg
         cleanupOnFailure(state)
         return
+
+  if not installManagedRuntime(sourceDir, gsdDir, opts.verbose):
+    result.success = false
+    result.message = "Failed to install managed runtime"
+    cleanupOnFailure(state)
+    return
 
   echo "Installing GSD to ", gsdDir, " + ", toolDir, "..."
 
@@ -955,12 +1002,7 @@ proc install*(sourceDir: string, opts: InstallOptions): InstallResult =
 
   var settings = loadSettings(settingsPath)
 
-  let (gsdBinaryPath, gsdNotFound) = findGsdBinary()
-
-  if gsdNotFound:
-    echo "  Warning: gsd binary not found in standard locations."
-    echo "           Hooks will use 'gsd' and assume it's in PATH."
-    echo "           Consider moving gsd to /usr/local/bin/ or ~/.local/bin/"
+  let gsdBinaryPath = getManagedBinaryPath(gsdDir)
 
   # Merge hooks (--config-dir points to .gsd/)
   let gsdHooks = createGsdHooks(gsdBinaryPath, gsdDir)

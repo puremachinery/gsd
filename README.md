@@ -60,10 +60,15 @@ cd gsd-darwin-arm64
 ./install --platform=codex --global
 ```
 
+The installer copies a managed runtime into `~/.gsd/runtime/` or `./.gsd/runtime/`,
+so you can remove the extracted release bundle after installation.
+
 Release bundles are available for:
-- macOS (Apple Silicon — also runs on Intel via Rosetta 2): `gsd-darwin-arm64.tar.gz`
+- macOS (Apple Silicon): `gsd-darwin-arm64.tar.gz`
 - Linux (x64): `gsd-linux-x64.tar.gz`
 - Windows (x64): `gsd-windows-x64.zip`
+
+Intel macOS is not currently shipped as a release artifact.
 
 ### Windows Quickstart (PowerShell)
 
