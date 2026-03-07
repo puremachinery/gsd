@@ -51,7 +51,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub API retry logic (1 retry with 500ms delay on network/timeout errors)
 - Update cache lifecycle tests (isCacheValid, loadCachedResult, saveCacheResult, ETag round-trip)
 - Claude Code install end-to-end tests (full structure verification, rollback validation)
-- Pre-push hook and `nimble verify` task for local validation
+- Pre-push hook and `nimble check` task for local validation
 - CONTRIBUTING.md and GitHub issue template
 
 ### Fixed

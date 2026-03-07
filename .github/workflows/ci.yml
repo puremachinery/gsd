@@ -43,7 +43,7 @@ jobs:
         run: nimble test -y
 
       - name: Bootstrap smoke
-        run: ./scripts/smoke/bootstrap-contract.sh installer/gsd
+        run: bash scripts/smoke/bootstrap-contract.sh installer/gsd
 
   format:
     runs-on: ubuntu-latest

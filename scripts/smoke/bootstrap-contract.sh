@@ -11,6 +11,23 @@ fail() {
   exit 1
 }
 
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || fail "required command not found: $1"
+}
+
+select_python() {
+  if command -v python3 >/dev/null 2>&1; then
+    printf '%s\n' "python3"
+    return 0
+  fi
+  if command -v python >/dev/null 2>&1; then
+    printf '%s\n' "python"
+    return 0
+  fi
+
+  fail "python3 or python is required"
+}
+
 resolve_path() {
   local path="$1"
   local dir base
@@ -65,9 +82,11 @@ run_project_bash() {
 
 [ "$#" -eq 1 ] || usage
 
+require_cmd bash
 GSD_BIN="$(resolve_path "$1")"
 [ -f "$GSD_BIN" ] || fail "gsd binary not found: $GSD_BIN"
 [ -x "$GSD_BIN" ] || fail "gsd binary is not executable: $GSD_BIN"
+PYTHON_BIN="$(select_python)"
 
 tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/gsd-bootstrap-smoke.XXXXXX")"
 cleanup() {
@@ -134,7 +153,7 @@ assert_contains "$codex_config_content" "$managed_bin check-update --config-dir 
 assert_contains "$codex_agents_content" "<!-- GSD:AGENTS START -->"
 assert_contains "$codex_agents_content" "gsd-roadmapper"
 
-python3 - "$gsd_config" "$gsd_dir" <<'PY'
+"$PYTHON_BIN" - "$gsd_config" "$gsd_dir" <<'PY'
 import json
 import pathlib
 import sys
@@ -164,7 +183,7 @@ fi')"
 assert_contains "$git_output" "Initialized new git repo"
 assert_dir "$project_dir/.git"
 
-brownfield_output="$(run_project_bash 'CODE_FILES=$(find . -name "*.ext" -o -name "*.ext" -o -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" 2>/dev/null | grep -v deps | grep -v .git | head -20)
+brownfield_output="$(run_project_bash 'CODE_FILES=$(find . -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" \) 2>/dev/null | grep -v deps | grep -v .git | head -20)
 HAS_PACKAGE=$([ -f project.manifest ] || [ -f requirements.txt ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f Package.swift ] && echo "yes")
 HAS_CODEBASE_MAP=$([ -d .planning/codebase ] && echo "yes")
 printf "CODE_FILES=%s\nHAS_PACKAGE=%s\nHAS_CODEBASE_MAP=%s\n" "$CODE_FILES" "$HAS_PACKAGE" "$HAS_CODEBASE_MAP"')"
@@ -188,7 +207,7 @@ update_output="$(run_in_project "$managed_bin" update --platform=both --dry-run)
 assert_contains "$update_output" "Would install GSD"
 assert_contains "$update_output" "Dry run complete. No files were modified."
 
-status_input="$(python3 - "$project_dir" <<'PY'
+status_input="$("$PYTHON_BIN" - "$project_dir" <<'PY'
 import json
 import sys
 
