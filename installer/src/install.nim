@@ -382,8 +382,8 @@ proc installManagedRuntime(sourceDir, gsdDir: string, verbose: bool): bool =
       copyFile(selfPath, managedBinaryPath)
       try:
         setFilePermissions(managedBinaryPath, getFilePermissions(selfPath))
-      except OSError:
-        discard
+      except OSError as e:
+        stderr.writeLine "Warning: Could not set permissions on managed runtime binary: ", e.msg
       log("Installed managed runtime binary", verbose)
     except OSError as e:
       stderr.writeLine "Error copying managed runtime binary: ", e.msg

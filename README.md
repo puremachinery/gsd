@@ -43,9 +43,9 @@ https://github.com/puremachinery/gsd/releases
 Then:
 
 ```bash
-# Extract the release bundle for your architecture
-tar -xzf gsd-darwin-arm64.tar.gz
-cd gsd-darwin-arm64
+# Extract the release bundle for your platform and architecture
+tar -xzf gsd-<platform>-<arch>.tar.gz
+cd gsd-<platform>-<arch>
 
 # Install globally (to ~/.claude)
 ./install --global
@@ -59,6 +59,11 @@ cd gsd-darwin-arm64
 # Install for Codex CLI (to ~/.codex)
 ./install --platform=codex --global
 ```
+
+Examples:
+- Apple Silicon macOS: `gsd-darwin-arm64.tar.gz`
+- Intel macOS: `gsd-darwin-x64.tar.gz`
+- Linux x64: `gsd-linux-x64.tar.gz`
 
 The installer copies a managed runtime into `~/.gsd/runtime/` or `./.gsd/runtime/`,
 so you can remove the extracted release bundle after installation.
