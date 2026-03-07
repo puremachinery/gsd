@@ -59,7 +59,7 @@ This is the most leveraged moment in any project. Deep questioning here means be
 
 3. **Detect existing code (brownfield detection):**
    ```bash
-   CODE_FILES=$(find . -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" \) 2>/dev/null | grep -v deps | grep -vF ".git" | head -20)
+   CODE_FILES=$(find . -path './.git' -prune -o -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" \) -print 2>/dev/null | grep -v deps | head -20)
    HAS_PACKAGE=$({ [ -f project.manifest ] || [ -f requirements.txt ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f Package.swift ]; } && echo "yes")
    HAS_CODEBASE_MAP=$([ -d .planning/codebase ] && echo "yes")
    ```

@@ -104,7 +104,7 @@ assert_not_contains "$claude_prompt_content" "@~/.gsd/"
 assert_contains "$codex_prompt_content" "@.gsd/references/questioning.md"
 assert_contains "$codex_prompt_content" ".planning/PROJECT.md"
 assert_not_contains "$codex_prompt_content" "@~/.gsd/"
-assert_contains "$claude_prompt_content" 'CODE_FILES=$(find . -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" \) 2>/dev/null | grep -v deps | grep -vF ".git" | head -20)'
+assert_contains "$claude_prompt_content" 'CODE_FILES=$(find . -path '\''./.git'\'' -prune -o -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" \) -print 2>/dev/null | grep -v deps | head -20)'
 assert_contains "$claude_prompt_content" 'HAS_PACKAGE=$({ [ -f project.manifest ] || [ -f requirements.txt ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f Package.swift ]; } && echo "yes")'
 
 assert_contains "$claude_settings_content" "$managed_bin"
@@ -149,7 +149,7 @@ fi')"
 assert_contains "$git_output" "Initialized new git repo"
 assert_dir "$project_dir/.git"
 
-brownfield_output="$(run_project_bash 'CODE_FILES=$(find . -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" \) 2>/dev/null | grep -v deps | grep -vF ".git" | head -20)
+brownfield_output="$(run_project_bash 'CODE_FILES=$(find . -path '\''./.git'\'' -prune -o -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" \) -print 2>/dev/null | grep -v deps | head -20)
 HAS_PACKAGE=$({ [ -f project.manifest ] || [ -f requirements.txt ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f Package.swift ]; } && echo "yes")
 HAS_CODEBASE_MAP=$([ -d .planning/codebase ] && echo "yes")
 printf "CODE_FILES=%s\nHAS_PACKAGE=%s\nHAS_CODEBASE_MAP=%s\n" "$CODE_FILES" "$HAS_PACKAGE" "$HAS_CODEBASE_MAP"')"

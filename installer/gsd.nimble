@@ -27,7 +27,10 @@ task format, "Format source with nimpretty":
       exec "nimpretty --maxLineLen:100 " & quoteShell(f)
 
 task smoke_script, "Run the bootstrap smoke contract script":
-  exec "bash ../scripts/smoke/bootstrap-contract.sh gsd"
+  when defined(windows):
+    echo "Skipping bootstrap smoke on Windows; requires Bash."
+  else:
+    exec "bash ../scripts/smoke/bootstrap-contract.sh gsd"
 
 task smoke, "Run bootstrap smoke contract":
   exec "nimble build -y"
