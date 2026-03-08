@@ -59,7 +59,7 @@ This is the most leveraged moment in any project. Deep questioning here means be
 
 3. **Detect existing code (brownfield detection):**
    ```bash
-   CODE_FILES=$(find . \( -path './.git' -o -path './deps' \) -prune -o -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" -o -name "*.js" -o -name "*.jsx" -o -name "*.ts" -o -name "*.tsx" \) -print 2>/dev/null | head -20)
+   CODE_FILES=$(find . \( -path './.git' -o -path './deps' \) -prune -o -type f \( -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.swift" -o -name "*.java" -o -name "*.js" -o -name "*.jsx" -o -name "*.ts" -o -name "*.tsx" \) -print 2>/dev/null | awk 'NR <= 20 { print }')
    if [ -f project.manifest ] || [ -f requirements.txt ] || [ -f pyproject.toml ] || [ -f Cargo.toml ] || [ -f go.mod ] || [ -f package.json ] || [ -f Package.swift ]; then
        HAS_PACKAGE="yes"
    else
