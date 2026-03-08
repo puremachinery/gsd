@@ -1,0 +1,84 @@
+name: Claude Code
+
+on:
+  issue_comment:
+    types: [created]
+  issues:
+    types: [opened]
+
+jobs:
+  claude:
+    concurrency:
+      group: claude-${{ github.event.issue.number }}
+      cancel-in-progress: true
+    if: |
+      github.actor != 'claude[bot]' &&
+      (
+        (github.event_name == 'issue_comment' &&
+          contains(github.event.comment.body || '', '@claude') &&
+          (github.event.comment.author_association == 'OWNER' ||
+           github.event.comment.author_association == 'MEMBER' ||
+           github.event.comment.author_association == 'COLLABORATOR')) ||
+        (github.event_name == 'issues' &&
+          (contains(github.event.issue.body || '', '@claude') ||
+           contains(github.event.issue.title || '', '@claude')) &&
+          (github.event.issue.author_association == 'OWNER' ||
+           github.event.issue.author_association == 'MEMBER' ||
+           github.event.issue.author_association == 'COLLABORATOR'))
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read # Required for Claude to read CI results on PRs
+    steps:
+      - name: Detect same-repo PR context for issue_comment
+        id: pr-context
+        if: ${{ github.event_name == 'issue_comment' && github.event.issue.pull_request }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            const sameRepo =
+              pr.data.head.repo &&
+              pr.data.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}`;
+            core.setOutput("same_repo", sameRepo ? "true" : "false");
+
+      - name: Skip fork PR comment invocation
+        if: ${{ github.event_name == 'issue_comment' && github.event.issue.pull_request && steps.pr-context.outputs.same_repo != 'true' }}
+        run: |
+          echo "Skipping @claude on fork PR issue_comment context to avoid checking out untrusted code with repo secrets."
+
+      - name: Checkout repository (PR context)
+        if: ${{ github.event_name == 'issue_comment' && github.event.issue.pull_request && steps.pr-context.outputs.same_repo == 'true' }}
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          ref: refs/pull/${{ github.event.issue.number }}/head
+
+      - name: Checkout repository (issue context)
+        if: ${{ github.event_name == 'issues' || (github.event_name == 'issue_comment' && !github.event.issue.pull_request) }}
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code
+        id: claude
+        if: ${{ github.event_name != 'issue_comment' || !github.event.issue.pull_request || steps.pr-context.outputs.same_repo == 'true' }}
+        uses: anthropics/claude-code-action@220272d38887a1caed373da96a9ffdb0919c26cc # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
+          # prompt: 'Update the pull request description to include a summary of changes.'
+
+          # Optional: Add claude_args to customize behavior and configuration
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          # or https://code.claude.com/docs/en/cli-reference for available options
+          # claude_args: '--allowedTools Bash(gh pr:*)'
