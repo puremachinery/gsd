@@ -9,7 +9,7 @@ on:
 jobs:
   claude:
     concurrency:
-      group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+      group: claude-${{ github.event.issue.number }}
       cancel-in-progress: true
     if: |
       github.actor != 'claude[bot]' &&
