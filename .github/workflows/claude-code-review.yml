@@ -1,9 +1,10 @@
 name: Claude Code Review
 
 on:
-  # Use pull_request_target so Claude app-token validation uses default-branch workflow content.
-  # This preserves claude[bot] identity even when the PR modifies Claude workflow files.
-  pull_request_target:
+  # Same-repo PRs are the only supported review target in this workflow.
+  # Use pull_request so Claude sees the actual PR head workflow/content instead
+  # of the pull_request_target OIDC path that is currently failing here.
+  pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
 
 concurrency:
@@ -21,8 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
-      issues: read
+      pull-requests: write
+      issues: write
       id-token: write
       actions: read
 
@@ -31,7 +32,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-          ref: refs/pull/${{ github.event.pull_request.number }}/head
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Record cleanup window start time
         id: cleanup-window
