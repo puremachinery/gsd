@@ -26,7 +26,7 @@ If no VERSION files are found, continue with update instructions anyway.
 <step name="check_latest_version">
 Check GitHub API for latest release (if your tool supports web browsing/fetch):
 
-- URL: `https://api.github.com/repos/puremachinery/gsd/releases/latest`
+- URL: `https://api.github.com/repos/puremachinery/get-stuff-done/releases/latest`
 - Extract the `tag_name` field (version number). If the response is a 404 or "Not Found", treat as "no-releases".
 
 **If response is 404 or "Not Found"** (no releases published yet):
@@ -35,7 +35,7 @@ Check GitHub API for latest release (if your tool supports web browsing/fetch):
 
 No releases published yet. You're running a development version.
 
-Check https://github.com/puremachinery/gsd/releases for future releases.
+Check https://github.com/puremachinery/get-stuff-done/releases for future releases.
 ```
 
 STOP here if no releases.
@@ -44,7 +44,7 @@ STOP here if no releases.
 ```
 Couldn't check for updates (offline or GitHub unavailable).
 
-Check manually: https://github.com/puremachinery/gsd/releases
+Check manually: https://github.com/puremachinery/get-stuff-done/releases
 ```
 
 Proceed to update instructions.
@@ -92,7 +92,7 @@ gsd update
 If `gsd update` fails with "Cannot find GSD source files" or `gsd` is not on PATH:
 
 1. Download the latest release bundle for your platform:
-   https://github.com/puremachinery/gsd/releases/latest
+   https://github.com/puremachinery/get-stuff-done/releases/latest
 2. Run the updater from the extracted bundle directory:
    ```bash
    ./gsd update
@@ -115,7 +115,7 @@ Format completion message:
 
 Restart your tool (Claude Code or Codex CLI) to pick up the new commands.
 
-View full changelog: https://github.com/puremachinery/gsd/blob/master/CHANGELOG.md
+View full changelog: https://github.com/puremachinery/get-stuff-done/blob/master/CHANGELOG.md
 ```
 </step>
 

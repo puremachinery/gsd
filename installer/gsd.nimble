@@ -1,8 +1,8 @@
 import os
 
 # Package
-version       = "0.3.3"
-author        = "Zera Alexander"
+version       = "0.3.4"
+author        = "mach"
 description   = "GSD installer and hooks for Claude Code and Codex CLI"
 license       = "MIT"
 srcDir        = "src"

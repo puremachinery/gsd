@@ -6,15 +6,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+---
+
+## [0.3.4] - 2026-03-08
+
 ### Added
 - Deterministic bootstrap smoke contract (`nimble smoke`) that installs GSD into a temp project and verifies runtime, prompt rewrites, and managed-binary behavior
 - Manual live `gsd:new-project` smoke workflow and Codex runner script for real end-to-end project initialization
+- macOS Intel (x64) release bundle
+- Claude Code GitHub Actions workflow (manually triggered `@claude` review)
+- CLI flag validation — unknown flags are now rejected with a clear error
 
 ### Changed
-- Local full-project validation now runs via `nimble verify` because `nimble check` is reserved for Nimble's built-in package validation
+- Repository renamed from `gsd` to `get-stuff-done` for discoverability; all URLs updated (GitHub auto-redirects old links)
+- Codex CLI platform status upgraded from "Supported (beta)" to "Supported"
+- Local full-project validation now runs via `nimble verify` (`nimble check` is reserved for Nimble's built-in package validation)
+- Agent prompt improvements for better subagent output quality
 
 ### Fixed
-- Bundled prompt reference files now ship with GSD (`questioning.md`, `ui-brand.md`, `project.md`, `requirements.md`) so `gsd:new-project` and related workflows can actually resolve their referenced context at runtime
+- Bundled prompt reference files now ship with GSD (`questioning.md`, `ui-brand.md`, `project.md`, `requirements.md`) so `gsd:new-project` and related workflows resolve their referenced context at runtime
+- Managed runtime binary path stability across install/update cycles
+- Brownfield detection no longer fails on empty git repositories
 
 ---
 
@@ -104,9 +116,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-[Unreleased]: https://github.com/puremachinery/gsd/compare/v0.3.3...HEAD
-[0.3.3]: https://github.com/puremachinery/gsd/compare/v0.3.2...v0.3.3
-[0.3.2]: https://github.com/puremachinery/gsd/compare/v0.3.1...v0.3.2
-[0.3.1]: https://github.com/puremachinery/gsd/compare/v0.3.0...v0.3.1
-[0.3.0]: https://github.com/puremachinery/gsd/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/puremachinery/gsd/commits/v0.2.0
+[Unreleased]: https://github.com/puremachinery/get-stuff-done/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/puremachinery/get-stuff-done/compare/v0.3.3...v0.3.4
+[0.3.3]: https://github.com/puremachinery/get-stuff-done/compare/v0.3.2...v0.3.3
+[0.3.2]: https://github.com/puremachinery/get-stuff-done/compare/v0.3.1...v0.3.2
+[0.3.1]: https://github.com/puremachinery/get-stuff-done/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/puremachinery/get-stuff-done/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/puremachinery/get-stuff-done/commits/v0.2.0

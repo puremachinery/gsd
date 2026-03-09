@@ -7,7 +7,7 @@ Thanks for your interest in contributing. Here's how to get started.
 1. Install [Nim](https://nim-lang.org/) 2.0+
 2. Clone the repo and build:
    ```bash
-   git clone https://github.com/puremachinery/gsd.git
+   git clone https://github.com/puremachinery/get-stuff-done.git
    cd gsd/installer
    nimble build
    nimble test
@@ -46,11 +46,11 @@ Thanks for your interest in contributing. Here's how to get started.
 
 ## What to Work On
 
-Check [open issues](https://github.com/puremachinery/gsd/issues) for bugs and feature requests. Issues labeled `good first issue` are a good starting point.
+Check [open issues](https://github.com/puremachinery/get-stuff-done/issues) for bugs and feature requests. Issues labeled `good first issue` are a good starting point.
 
 ## Reporting Bugs
 
-Use the [bug report template](https://github.com/puremachinery/gsd/issues/new?template=bug_report.md) and include:
+Use the [bug report template](https://github.com/puremachinery/get-stuff-done/issues/new?template=bug_report.md) and include:
 - GSD version (`gsd --version`)
 - Platform (macOS/Linux/Windows)
 - Steps to reproduce

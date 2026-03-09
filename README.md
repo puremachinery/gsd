@@ -32,13 +32,13 @@ The system provides:
 | Platform | Status |
 |----------|--------|
 | Claude Code | Supported |
-| Codex CLI | Supported (beta) |
+| Codex CLI | Supported |
 
 ## Installation
 
 Download the release bundle for your platform from:
 
-https://github.com/puremachinery/gsd/releases
+https://github.com/puremachinery/get-stuff-done/releases
 
 Then:
 
@@ -124,7 +124,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details.
 Requires [Nim](https://nim-lang.org/) 2.0+.
 
 ```bash
-git clone https://github.com/puremachinery/gsd.git
+git clone https://github.com/puremachinery/get-stuff-done.git
 cd gsd/installer
 nimble build          # build the binary
 nimble test           # run tests

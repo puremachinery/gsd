@@ -5,7 +5,7 @@ import std/[httpclient, json, os, options, strutils, times]
 import config, platform
 
 const
-  GitHubApiUrl = "https://api.github.com/repos/puremachinery/gsd/releases/latest"
+  GitHubApiUrl = "https://api.github.com/repos/puremachinery/get-stuff-done/releases/latest"
   UserAgent = "gsd-cli/" & Version
   CacheFileName = "gsd-update-check.json"
   CacheTtlHours = 24

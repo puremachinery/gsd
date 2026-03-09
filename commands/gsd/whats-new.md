@@ -33,7 +33,7 @@ fi
 
 Your installation doesn't include version tracking.
 
-**To fix:** Download and reinstall from https://github.com/puremachinery/gsd/releases
+**To fix:** Download and reinstall from https://github.com/puremachinery/get-stuff-done/releases
 ```
 
 STOP here if no VERSION file.
@@ -43,7 +43,7 @@ STOP here if no VERSION file.
 Fetch latest CHANGELOG.md from GitHub:
 
 Use WebFetch tool with:
-- URL: `https://raw.githubusercontent.com/puremachinery/gsd/master/CHANGELOG.md`
+- URL: `https://raw.githubusercontent.com/puremachinery/get-stuff-done/master/CHANGELOG.md`
 - Prompt: "Extract all version entries with their dates and changes. Return in Keep-a-Changelog format."
 
 **If fetch fails:**
@@ -76,7 +76,7 @@ From the remote (or local) changelog:
 
 This project hasn't published any releases yet. You're running a development version.
 
-Check https://github.com/puremachinery/gsd/releases for updates.
+Check https://github.com/puremachinery/get-stuff-done/releases for updates.
 ```
 
 **Version comparison:**
@@ -98,7 +98,7 @@ Format output clearly:
 
 You're on the latest version.
 
-[View full changelog](https://github.com/puremachinery/gsd/blob/master/CHANGELOG.md)
+[View full changelog](https://github.com/puremachinery/get-stuff-done/blob/master/CHANGELOG.md)
 ```
 
 **If updates available:**
@@ -116,9 +116,9 @@ You're on the latest version.
 
 ---
 
-[View full changelog](https://github.com/puremachinery/gsd/blob/master/CHANGELOG.md)
+[View full changelog](https://github.com/puremachinery/get-stuff-done/blob/master/CHANGELOG.md)
 
-**To update:** `gsd update` or download from https://github.com/puremachinery/gsd/releases
+**To update:** `gsd update` or download from https://github.com/puremachinery/get-stuff-done/releases
 ```
 
 **Breaking changes:** Surface prominently with **BREAKING:** prefix in the output.

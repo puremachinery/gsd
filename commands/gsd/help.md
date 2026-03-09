@@ -41,7 +41,7 @@ Shows what changed since your installed version. Update with:
 /gsd:update
 ```
 
-Or download the latest release from https://github.com/puremachinery/gsd/releases
+Or download the latest release from https://github.com/puremachinery/get-stuff-done/releases
 
 ## Core Workflow
 

@@ -142,7 +142,7 @@ suite "loadCachedResult":
       "current_version": "0.2.0",
       "latest_version": "0.3.0",
       "update_available": true,
-      "release_url": "https://github.com/puremachinery/gsd/releases/v0.3.0",
+      "release_url": "https://github.com/puremachinery/get-stuff-done/releases/v0.3.0",
       "checked_at": "2026-01-01T00:00:00Z",
       "etag": "abc123"
     }
@@ -154,7 +154,7 @@ suite "loadCachedResult":
     check r.currentVersion == "0.2.0"
     check r.latestVersion == "0.3.0"
     check r.updateAvailable == true
-    check r.releaseUrl == "https://github.com/puremachinery/gsd/releases/v0.3.0"
+    check r.releaseUrl == "https://github.com/puremachinery/get-stuff-done/releases/v0.3.0"
 
 suite "saveCacheResult":
   test "writes correct JSON structure":
@@ -167,7 +167,7 @@ suite "saveCacheResult":
       currentVersion: "0.2.0",
       latestVersion: "0.3.0",
       updateAvailable: true,
-      releaseUrl: "https://github.com/puremachinery/gsd/releases/v0.3.0"
+      releaseUrl: "https://github.com/puremachinery/get-stuff-done/releases/v0.3.0"
     )
 
     saveCacheResult(cachePath, checkResult, "etag-value")
@@ -179,7 +179,7 @@ suite "saveCacheResult":
     check json["latest_version"].getStr() == "0.3.0"
     check json["update_available"].getBool() == true
     check json["release_url"].getStr() ==
-        "https://github.com/puremachinery/gsd/releases/v0.3.0"
+        "https://github.com/puremachinery/get-stuff-done/releases/v0.3.0"
     check json["etag"].getStr() == "etag-value"
     check json.hasKey("checked_at")
 
