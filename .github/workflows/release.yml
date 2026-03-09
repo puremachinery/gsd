@@ -22,7 +22,7 @@ jobs:
           - os: macos-14
             bundle: gsd-darwin-x64
             archive: tar.gz
-            nim_flags: '--cpu:amd64 --passC:"-target x86_64-apple-macos12" --passL:"-target x86_64-apple-macos12"'
+            cross_compile: true
           - os: ubuntu-latest
             bundle: gsd-linux-x64
             archive: tar.gz
@@ -45,7 +45,14 @@ jobs:
       - name: Build gsd
         run: |
           cd installer
-          nimble build -y -d:release --opt:size ${{ matrix.nim_flags }}
+          if [ "${{ matrix.cross_compile }}" = "true" ]; then
+            nim c -d:release --opt:size --cpu:amd64 \
+              --passC:"-target x86_64-apple-macos12" \
+              --passL:"-target x86_64-apple-macos12" \
+              -o:gsd src/gsd.nim
+          else
+            nimble build -y -d:release --opt:size
+          fi
 
       - name: Run tests (linux only)
         if: matrix.os == 'ubuntu-latest'
