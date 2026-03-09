@@ -43,6 +43,7 @@ jobs:
         run: sudo apt-get install -y libpcre3-dev
 
       - name: Build gsd
+        shell: bash
         run: |
           cd installer
           if [ "${{ matrix.cross_compile }}" = "true" ]; then
