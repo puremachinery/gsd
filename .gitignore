@@ -11,6 +11,7 @@ CLAUDE.md
 
 # Local test installs
 .claude/
+.gsd/
 
 # Nim build artifacts
 installer/gsd
