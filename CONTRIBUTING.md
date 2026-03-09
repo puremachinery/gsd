@@ -8,7 +8,7 @@ Thanks for your interest in contributing. Here's how to get started.
 2. Clone the repo and build:
    ```bash
    git clone https://github.com/puremachinery/get-stuff-done.git
-   cd gsd/installer
+   cd get-stuff-done/installer
    nimble build
    nimble test
    ```

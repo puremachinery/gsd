@@ -537,7 +537,7 @@ rm -rf ~/.gsd ~/.claude ~/.codex
    ./gsd --version
    ```
 
-2. **Expected:** Version string like `gsd 0.3.3`
+2. **Expected:** Version string like `gsd 0.3.4`
 
 ---
 

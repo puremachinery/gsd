@@ -91,7 +91,7 @@ Resolution order:
 
 ```json
 {
-  "version": "0.3.0",
+  "version": "0.3.4",
   "install_type": "global",
   "gsd_dir": "/Users/name/.gsd",
   "platforms": ["claude", "codex"],
@@ -158,7 +158,7 @@ Example input:
 
 ```json
 {
-  "model": {"display_name": "Claude Opus 4"},
+  "model": {"display_name": "Claude Opus 4.6"},
   "workspace": {"current_dir": "/Users/name/my-project"},
   "session_id": "abc-123",
   "context_window": {"remaining_percentage": 72}
@@ -206,7 +206,7 @@ Uses `~/.codex/` as the tool-specific config directory, mirroring the Claude Cod
 | `agents/gsd-*.md` (separate files) | `AGENTS.md` (concatenated) |
 | `settings.json` hooks | `config.toml` `[[notify]]` hooks |
 
-Commands are installed as `prompts/gsd-help.md`, `prompts/gsd-help.md`, etc. Agents are concatenated into a single `AGENTS.md` file (Codex convention). The `#gsd` marker tags GSD-owned hooks for safe updates.
+Commands are installed as `prompts/gsd-help.md`, `prompts/gsd-new-project.md`, etc. Agents are concatenated into a single `AGENTS.md` file (Codex convention). The `#gsd` marker tags GSD-owned hooks for safe updates.
 
 **3. Repo Layout: Shared Source**
 

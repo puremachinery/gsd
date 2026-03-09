@@ -23,10 +23,6 @@ The system provides:
 - **Atomic git commits** per task for clean, bisectable history
 - **Session continuity** across context resets
 
-## Status
-
-**Active.** The installer is a native Nim binary; releases bundle the binary and all prompt content.
-
 ## Platforms
 
 | Platform | Status |
@@ -40,39 +36,32 @@ Download the release bundle for your platform from:
 
 https://github.com/puremachinery/get-stuff-done/releases
 
-Then:
+| Platform | Bundle |
+|----------|--------|
+| macOS (Apple Silicon) | `gsd-darwin-arm64.tar.gz` |
+| macOS (Intel) | `gsd-darwin-x64.tar.gz` |
+| Linux (x64) | `gsd-linux-x64.tar.gz` |
+| Windows (x64) | `gsd-windows-x64.zip` |
 
 ```bash
-# Extract the release bundle for your platform and architecture
 tar -xzf gsd-<platform>-<arch>.tar.gz
 cd gsd-<platform>-<arch>
 
 # Install globally (to ~/.claude)
 ./install --global
 
-# Preview changes without writing files
-./install --platform=both --dry-run
-
 # Or install locally (to ./.claude in current project)
 ./install --local
 
 # Install for Codex CLI (to ~/.codex)
 ./install --platform=codex --global
+
+# Preview changes without writing files
+./install --platform=both --dry-run
 ```
 
-Examples:
-- Apple Silicon macOS: `gsd-darwin-arm64.tar.gz`
-- Intel macOS: `gsd-darwin-x64.tar.gz`
-- Linux x64: `gsd-linux-x64.tar.gz`
-
-The installer copies a managed runtime into `~/.gsd/runtime/` or `./.gsd/runtime/`,
+The installer copies a managed runtime into `~/.gsd/runtime/`,
 so you can remove the extracted release bundle after installation.
-
-Release bundles are available for:
-- macOS (Apple Silicon): `gsd-darwin-arm64.tar.gz`
-- macOS (Intel): `gsd-darwin-x64.tar.gz`
-- Linux (x64): `gsd-linux-x64.tar.gz`
-- Windows (x64): `gsd-windows-x64.zip`
 
 ### Windows Quickstart (PowerShell)
 
@@ -125,7 +114,7 @@ Requires [Nim](https://nim-lang.org/) 2.0+.
 
 ```bash
 git clone https://github.com/puremachinery/get-stuff-done.git
-cd gsd/installer
+cd get-stuff-done/installer
 nimble build          # build the binary
 nimble test           # run tests
 nimble smoke          # temp-dir install/bootstrap smoke
