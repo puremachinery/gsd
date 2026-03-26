@@ -133,6 +133,20 @@ Execute all plans in a phase.
 
 Usage: `/gsd:execute-phase 5`
 
+### Quick Tasks
+
+**`/gsd:quick <task description>`**
+Execute a small task directly without planning overhead.
+
+- Runs inline (no subagents, no planning artifacts)
+- Atomic commit with descriptive message
+- Updates STATE.md if project exists
+- Works with or without `.planning/` structure
+- Suggests full workflow if task is complex
+
+Usage: `/gsd:quick "Fix off-by-one in pagination"`
+Usage: `/gsd:quick "Add created_at to User model"`
+
 ### Roadmap Management
 
 **`/gsd:add-phase <description>`**
@@ -367,6 +381,13 @@ Change anytime by editing `.planning/config.json`
 /gsd:add-todo Fix modal z-index  # Capture with explicit description
 /gsd:check-todos                 # Review and work on todos
 /gsd:check-todos api             # Filter by area
+```
+
+**Quick fixes and small tasks:**
+
+```
+/gsd:quick "Fix typo in login error message"
+/gsd:quick "Add CORS header for staging domain"
 ```
 
 **Debugging an issue:**
