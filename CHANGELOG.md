@@ -8,6 +8,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.3.5] - 2026-03-26
+
+### Added
+- `/gsd:quick` command — execute small tasks directly without planning overhead (atomic commits, STATE.md tracking, complexity gate)
+- `/gsd:next` command — auto-detect and execute the next workflow step (respects interactive/YOLO mode)
+- Claude Code GitHub Actions review workflow
+
+---
+
 ## [0.3.4] - 2026-03-08
 
 ### Added
@@ -116,7 +125,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-[Unreleased]: https://github.com/puremachinery/get-stuff-done/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/puremachinery/get-stuff-done/compare/v0.3.5...HEAD
+[0.3.5]: https://github.com/puremachinery/get-stuff-done/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/puremachinery/get-stuff-done/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/puremachinery/get-stuff-done/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/puremachinery/get-stuff-done/compare/v0.3.1...v0.3.2
