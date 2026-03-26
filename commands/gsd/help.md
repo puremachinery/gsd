@@ -49,6 +49,8 @@ Or download the latest release from https://github.com/puremachinery/get-stuff-d
 /gsd:new-project → /gsd:plan-phase → /gsd:execute-phase → repeat
 ```
 
+Or just let GSD figure it out: **`/gsd:next`** — auto-detects and runs the next step.
+
 ### Project Initialization
 
 **`/gsd:new-project`**
@@ -146,6 +148,18 @@ Execute a small task directly without planning overhead.
 
 Usage: `/gsd:quick "Fix off-by-one in pagination"`
 Usage: `/gsd:quick "Add created_at to User model"`
+
+### Automatic Routing
+
+**`/gsd:next`**
+Auto-detect and execute the next workflow step.
+
+- Reads STATE.md and phase state to determine what's next
+- In interactive mode: confirms before executing
+- In YOLO mode: executes immediately
+- Detects: unexecuted plans, unplanned phases, milestone completion, paused work
+
+Usage: `/gsd:next`
 
 ### Roadmap Management
 
